@@ -72,13 +72,13 @@ def save_scenario(
         recycled_material_percentage=scen_in.recycled_material_percentage,
         waste_recovery_percentage=scen_in.waste_recovery_percentage,
         transport_reduction_percentage=scen_in.transport_reduction_percentage,
-        result_co2e_tonnes=sim["projected_emissions_tco2e"],
-        reduction_percentage=sim["reduction_percentage"],
-        cost_estimate_inr=sim["capex_estimate_inr"],
-        annual_savings_inr=sim["annual_savings_inr"],
-        payback_months=sim["payback_months"],
-        circularity_score=sim["projected_circularity_score"],
-        is_recommended=sim["reduction_percentage"] > 25.0
+        result_co2e_tonnes=sim.get("simulated_co2e_t") or sim.get("projected_emissions_tco2e", 0.0),
+        reduction_percentage=sim.get("reduction_percentage", 0.0),
+        cost_estimate_inr=sim.get("estimated_capex_inr") or sim.get("capex_estimate_inr", 0.0),
+        annual_savings_inr=sim.get("estimated_annual_savings_inr") or sim.get("annual_savings_inr", 0.0),
+        payback_months=sim.get("payback_months", 0.0),
+        circularity_score=sim.get("new_circularity_score") or sim.get("projected_circularity_score", 0.0),
+        is_recommended=sim.get("reduction_percentage", 0.0) > 25.0
     )
     db.add(scen)
     db.commit()
