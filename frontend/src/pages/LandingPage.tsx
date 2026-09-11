@@ -18,6 +18,7 @@ import {
   FileCheck
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { EcoDetectLogo } from "../components/EcoDetectLogo";
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -86,17 +87,13 @@ export const LandingPage: React.FC = () => {
       {/* Top Navbar */}
       <nav className="h-16 border-b border-industrial-800/80 px-6 lg:px-12 flex items-center justify-between backdrop-blur-md sticky top-0 z-50 bg-industrial-950/80">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-carbon-emerald via-carbon-green to-carbon-lime p-0.5 shadow-glow-green">
-            <div className="w-full h-full bg-industrial-950 rounded-[10px] flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-carbon-green" />
-            </div>
-          </div>
+          <EcoDetectLogo size="md" />
           <div>
             <div className="flex items-center space-x-1.5">
-              <span className="font-bold tracking-tight text-white font-mono text-base">CARBONCOPILOT</span>
+              <span className="font-bold tracking-tight text-white font-mono text-base">ECODETECT</span>
               <span className="bg-carbon-green/20 text-carbon-green text-[10px] font-mono px-1.5 py-0.5 rounded font-bold border border-carbon-green/40">AI</span>
             </div>
-            <p className="text-[10px] text-industrial-400 font-mono tracking-wider uppercase">HackOut'26 Official Solution</p>
+            <p className="text-[10px] text-industrial-400 font-mono tracking-wider uppercase">Industrial Ecological Intelligence</p>
           </div>
         </div>
 
@@ -119,10 +116,10 @@ export const LandingPage: React.FC = () => {
 
       {/* Hero Section */}
       <section className="relative px-6 lg:px-12 pt-16 pb-16 max-w-6xl mx-auto text-center">
-        {/* HackOut Pill */}
+        {/* Detection Pill */}
         <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-carbon-green/10 border border-carbon-green/30 text-carbon-green text-xs font-mono mb-6">
           <span className="w-2 h-2 rounded-full bg-carbon-green animate-ping"></span>
-          <span>Industrial Emission Leak-Point Detector & Circular Recommender</span>
+          <span>Industrial Emission Leak-Point Detector &amp; Circular Recommender</span>
         </div>
 
         <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white max-w-4xl mx-auto leading-tight sm:leading-none mb-6">
@@ -133,7 +130,7 @@ export const LandingPage: React.FC = () => {
         </h1>
 
         <p className="text-industrial-300 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed mb-10 font-normal">
-          CarbonCopilot AI identifies where your factory's carbon emissions leak, explains why they happen, and delivers high-ROI circular alternatives with exact CO₂ cuts and payback periods.
+          EcoDetect AI identifies where your factory's carbon emissions leak, explains why they happen, and delivers high-ROI circular alternatives with exact CO₂ cuts and payback periods.
         </p>
 
         {/* CTA Buttons */}
@@ -298,7 +295,7 @@ export const LandingPage: React.FC = () => {
 
       {/* Footer */}
       <footer className="mt-auto border-t border-industrial-800/60 py-8 px-6 text-center text-xs text-industrial-500 font-mono">
-        <p>CarbonCopilot AI • HackOut'26 • Industrial Emission Leak-Point Detector & Circular Alternative Recommender</p>
+        <p>EcoDetect AI • Industrial Emission Leak-Point Detector &amp; Circular Alternative Recommender</p>
       </footer>
     </div>
   );

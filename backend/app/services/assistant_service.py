@@ -21,7 +21,7 @@ class AssistantService:
             return {
                 "response": "Please select or create an active factory carbon assessment first so I can ground answers in your verified plant data.",
                 "context_used": {},
-                "model_used": "CarbonCopilot Heuristic Engine",
+                "model_used": "EcoDetect Heuristic Engine",
                 "is_llm_active": False
             }
 
@@ -30,7 +30,7 @@ class AssistantService:
             return {
                 "response": "I don't have enough data to calculate this accurately. The requested assessment could not be located in the database.",
                 "context_used": {},
-                "model_used": "CarbonCopilot Heuristic Engine",
+                "model_used": "EcoDetect Heuristic Engine",
                 "is_llm_active": False
             }
 

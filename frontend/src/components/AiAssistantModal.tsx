@@ -24,7 +24,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
 }) => {
   const initialGreeting: Message = {
     role: "copilot",
-    content: `Hello! I am **CarbonCopilot AI**, your factory's operational decarbonization copilot${
+    content: `Hello! I am **EcoDetect AI**, your factory's operational decarbonization and ecological copilot${
       factoryName ? ` for **${factoryName}**` : ""
     }.\n\nAsk me anything about your verified Scope 1/2/3 emissions, top hotspots, solar transition ROI, or circular interventions.`,
   };
@@ -160,7 +160,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h3 className="font-semibold text-white text-sm tracking-tight">CarbonCopilot AI</h3>
+                <h3 className="font-semibold text-white text-sm tracking-tight">EcoDetect AI</h3>
                 {isLlmActive ? (
                   <span className="inline-flex items-center space-x-1 text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-1.5 py-0.5 rounded-full font-medium">
                     <Sparkles className="w-2.5 h-2.5 text-emerald-400" />
@@ -172,7 +172,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-industrial-400">Industrial Decarbonization & Circularity Copilot</p>
+              <p className="text-[11px] text-industrial-400">Industrial Ecological &amp; Decarbonization Copilot</p>
             </div>
           </div>
           <div className="flex items-center space-x-1">
@@ -224,7 +224,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
             <div className="flex justify-start">
               <div className="bg-industrial-850/80 border border-industrial-700/50 p-3 rounded-xl text-xs text-industrial-300 flex items-center space-x-2.5">
                 <span className="animate-spin text-carbon-green text-sm">⟳</span>
-                <span className="text-[11px]">CarbonCopilot reasoning with Gemini & plant context...</span>
+                <span className="text-[11px]">EcoDetect AI reasoning with Gemini &amp; plant context...</span>
               </div>
             </div>
           )}

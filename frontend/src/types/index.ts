@@ -106,6 +106,7 @@ export interface SimulatorResult {
 }
 
 export interface Scenario {
+  id?: number;
   name: string;
   description?: string;
   solar_percentage: number;
@@ -139,6 +140,8 @@ export interface ActionPlanItem {
 
 export interface DashboardSummary {
   has_assessment: boolean;
+  has_factory?: boolean;
+  factory_id?: number;
   assessment_id?: number;
   assessment_name?: string;
   factory_name?: string;

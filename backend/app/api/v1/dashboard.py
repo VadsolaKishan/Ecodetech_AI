@@ -29,8 +29,13 @@ def get_dashboard_summary(
     assessment = None
 
     if assessment_id:
-        assessment = verify_assessment_access(db, current_user, assessment_id, read_only=True)
-    else:
+        try:
+            assessment = verify_assessment_access(db, current_user, assessment_id, read_only=True)
+        except HTTPException:
+            # If current user switched or does not have access to this assessment_id, gracefully resolve default
+            assessment = None
+
+    if not assessment:
         # Resolve appropriate default assessment based on role
         if user_role == UserRole.ADMIN:
             assessment = db.query(Assessment).order_by(Assessment.created_at.desc()).first()
@@ -60,11 +65,28 @@ def get_dashboard_summary(
             assessment = db.query(Assessment).filter(Assessment.industry_id.in_(owned_ids) if owned_ids else Assessment.user_id == current_user.id).order_by(Assessment.created_at.desc()).first()
 
     if not assessment:
+        # Determine if this user already has an Industry profile
+        user_industry = None
+        if current_user.industry_id:
+            user_industry = db.query(Industry).filter(Industry.id == current_user.industry_id).first()
+        if not user_industry:
+            user_industry = db.query(Industry).filter(Industry.user_id == current_user.id).first()
+        if not user_industry and user_role in [UserRole.ADMIN.value, UserRole.REGULATOR_AUDITOR.value]:
+            user_industry = db.query(Industry).first()
+
+        has_fac = user_industry is not None
+        fac_name = user_industry.company_name if user_industry else None
+        ind_type = user_industry.industry_type if user_industry else None
+
         return ApiResponse(
             success=True,
             data={
                 "has_assessment": False,
-                "headline": "Welcome to CarbonCopilot AI. Create your factory profile and start an assessment to begin.",
+                "has_factory": has_fac,
+                "factory_name": fac_name,
+                "industry_type": ind_type,
+                "factory_id": user_industry.id if user_industry else None,
+                "headline": f"Factory profile active for {fac_name}. Run your first carbon assessment to unlock real-time emissions analytics." if has_fac else "Welcome to EcoDetect AI. Create your factory profile and start an assessment to begin.",
                 "kpis": {}
             }
         )

@@ -90,24 +90,57 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ activeAssessmentId
   }
 
   if (!summary?.has_assessment) {
+    const hasFactory = summary?.has_factory || !!summary?.factory_name;
     return (
       <div className="flex-1 p-8 max-w-4xl mx-auto text-center py-20 space-y-6">
         <div className="w-16 h-16 rounded-2xl bg-carbon-green/10 border border-carbon-green/30 text-carbon-green flex items-center justify-center mx-auto shadow-glow-green">
           <Sparkles className="w-8 h-8" />
         </div>
-        <h2 className="text-2xl font-bold text-white">No factory profile found.</h2>
-        <p className="text-sm text-industrial-400 max-w-md mx-auto">
-          Create your factory profile to begin.
-        </p>
-        <div className="flex justify-center gap-4 pt-2">
-          <Link
-            to="/profile"
-            className="px-6 py-2.5 rounded-xl bg-carbon-green text-industrial-950 font-bold text-xs hover:bg-carbon-lime transition-all shadow-glow-green flex items-center space-x-2"
-          >
-            <span>Create Factory Profile</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
+        
+        {hasFactory ? (
+          <>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-carbon-green/20 border border-carbon-green/40 text-carbon-green text-xs font-mono font-semibold">
+              <span>Verified Plant Profile Active</span>
+            </div>
+            <h2 className="text-2xl font-bold text-white tracking-tight">
+              {summary.factory_name}
+            </h2>
+            <p className="text-sm text-industrial-400 max-w-lg mx-auto">
+              Your facility profile ({summary.industry_type || "Manufacturing"}) is registered and verified. Run your first Carbon & Circularity Assessment to benchmark emissions and detect leak points.
+            </p>
+            <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
+              <Link
+                to="/assessment/new"
+                className="px-6 py-2.5 rounded-xl bg-carbon-green text-industrial-950 font-bold text-xs hover:bg-carbon-lime transition-all shadow-glow-green flex items-center justify-center space-x-2"
+              >
+                <span>Start Carbon Assessment</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                to="/profile"
+                className="px-5 py-2.5 rounded-xl bg-industrial-800 hover:bg-industrial-700 text-slate-300 font-semibold text-xs transition-colors flex items-center justify-center space-x-2 border border-industrial-700"
+              >
+                <span>Edit Factory Specifications</span>
+              </Link>
+            </div>
+          </>
+        ) : (
+          <>
+            <h2 className="text-2xl font-bold text-white">No factory profile found.</h2>
+            <p className="text-sm text-industrial-400 max-w-md mx-auto">
+              Create your factory operational profile to begin tracking carbon emissions and circular interventions.
+            </p>
+            <div className="flex justify-center gap-4 pt-2">
+              <Link
+                to="/profile"
+                className="px-6 py-2.5 rounded-xl bg-carbon-green text-industrial-950 font-bold text-xs hover:bg-carbon-lime transition-all shadow-glow-green flex items-center space-x-2"
+              >
+                <span>Create Factory Profile</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </>
+        )}
       </div>
     );
   }

@@ -129,8 +129,9 @@ export const AdminUsersPage: React.FC = () => {
                 </tr>
               ) : (
                 users.map((u) => {
-                  const roleKey = (u.role || "FACTORY_OWNER") as UserRole;
-                  const colors = ROLE_BADGE_COLORS[roleKey] || ROLE_BADGE_COLORS.FACTORY_OWNER;
+                  const normalizedRole = ((u.role || "FACTORY_OWNER").toUpperCase()) as UserRole;
+                  const colors = ROLE_BADGE_COLORS[normalizedRole] || ROLE_BADGE_COLORS.FACTORY_OWNER;
+                  const roleLabel = ROLE_LABELS[normalizedRole] || u.role;
 
                   return (
                     <tr key={u.id} className="hover:bg-industrial-800/30 transition-colors">
@@ -141,16 +142,16 @@ export const AdminUsersPage: React.FC = () => {
 
                       <td className="py-3 px-4">
                         <span className={`px-2.5 py-1 rounded-lg border text-xs font-semibold ${colors.bg} ${colors.text} ${colors.border}`}>
-                          {ROLE_LABELS[roleKey] || u.role}
+                          {roleLabel}
                         </span>
                       </td>
 
                       <td className="py-3 px-4">
                         <select
                           disabled={updatingId === u.id}
-                          value={u.role}
+                          value={normalizedRole}
                           onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                          className="bg-industrial-950 border border-industrial-700 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:border-carbon-green"
+                          className="bg-industrial-950 border border-industrial-700 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:border-carbon-green cursor-pointer"
                         >
                           <option value="FACTORY_OWNER">Factory Owner</option>
                           <option value="SUSTAINABILITY_CONSULTANT">Sustainability Consultant</option>

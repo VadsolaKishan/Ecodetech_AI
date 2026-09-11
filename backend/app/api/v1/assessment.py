@@ -4,7 +4,7 @@ from typing import List, Optional
 from app.database.session import get_db
 from app.models.models import (
     Assessment, Industry, EnergyInput, MaterialInput, WasteInput, TransportInput, User,
-    FactoryAssignment
+    FactoryAssignment, Factory
 )
 from app.schemas.schemas import AssessmentCreate, AssessmentOut, AssessmentFullDetail, ApiResponse
 from app.core.roles import UserRole, AuditEvent
@@ -113,9 +113,28 @@ def create_assessment(
         industry.production_unit = data.production_unit
     db.commit()
 
+    # Ensure Factory exists and is linked
+    factory = db.query(Factory).filter(Factory.industry_id == industry.id).first()
+    if not factory:
+        factory = Factory(
+            industry_id=industry.id,
+            owner_id=industry.user_id or current_user.id,
+            name=industry.company_name,
+            location=industry.factory_location,
+            sector=industry.industry_type
+        )
+        db.add(factory)
+        db.commit()
+        db.refresh(factory)
+
+    if not current_user.factory_id:
+        current_user.factory_id = factory.id
+        db.commit()
+
     assessment = Assessment(
         user_id=current_user.id,
         industry_id=industry.id,
+        factory_id=factory.id,
         name=data.name or "Factory Carbon Audit",
         assessment_period=data.assessment_period or "Monthly 2026",
         status="draft"
@@ -144,7 +163,7 @@ def create_assessment(
             unit=m.unit,
             virgin_percentage=m.virgin_percentage,
             recycled_percentage=m.recycled_percentage,
-            notes=m.notes
+            notes=getattr(m, 'notes', None)
         ))
 
     for w in data.waste_inputs:
@@ -155,7 +174,7 @@ def create_assessment(
             unit=w.unit,
             disposal_method=w.disposal_method,
             recyclable_percentage=w.recyclable_percentage,
-            notes=w.notes
+            notes=getattr(w, 'notes', None)
         ))
 
     for t in data.transport_inputs:

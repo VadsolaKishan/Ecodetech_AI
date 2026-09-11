@@ -6,7 +6,7 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT_TEMPLATE = """You are CarbonCopilot AI, an expert industrial decarbonization copilot and senior sustainability engineer.
+SYSTEM_PROMPT_TEMPLATE = """You are EcoDetect AI, an expert industrial decarbonization copilot and senior sustainability engineer.
 Your mission is to provide factory owners, plant managers, and sustainability teams with precise, verified, actionable insights to reduce carbon footprint (Scope 1, 2, 3) and increase circularity while maximizing financial ROI.
 
 PLANT AND ASSESSMENT CONTEXT:
@@ -187,7 +187,7 @@ class GeminiService:
 
         return {
             "response": fallback_resp,
-            "model_used": "CarbonCopilot Grounded Engine",
+            "model_used": "EcoDetect Grounded Engine",
             "is_llm_active": False
         }
 
@@ -256,7 +256,7 @@ class GeminiService:
                 return f"No recommendations are available yet. Complete and run your carbon assessment to view priority interventions."
             p1 = recs[0]
             return (
-                f"CarbonCopilot recommends implementing **Priority 1: {p1.get('title')}** first:\n\n"
+                f"EcoDetect AI recommends implementing **Priority 1: {p1.get('title')}** first:\n\n"
                 f"• **Target Area:** {p1.get('category')}\n"
                 f"• **CO₂ Reduction:** {p1.get('co2_reduction_kg', 0):,.0f} kg CO₂e\n"
                 f"• **Capital Investment:** ₹{p1.get('cost_inr', 0):,.0f}\n"
@@ -299,7 +299,7 @@ class GeminiService:
 
         # Default overview
         return (
-            f"Hello! I am **CarbonCopilot**, your industrial decarbonization copilot for **{factory}**.\n\n"
+            f"Hello! I am **EcoDetect AI**, your industrial decarbonization and ecological copilot for **{factory}**.\n\n"
             f"**Operational Snapshot:**\n"
             f"• **Total Footprint:** **{context.get('total_emissions_tco2e', 0)} tCO₂e** (Scope 1: {context.get('scope1', 0)}t | Scope 2: {context.get('scope2', 0)}t | Scope 3: {context.get('scope3', 0)}t)\n"
             f"• **Top Emission Hotspot:** {context.get('top_hotspot', 'N/A')} ({context.get('top_hotspot_pct', 0)}%)\n"

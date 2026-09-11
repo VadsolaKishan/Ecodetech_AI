@@ -23,8 +23,8 @@ export const ScenarioComparisonPage: React.FC<ScenarioComparisonPageProps> = ({ 
       if (scenarios.length === 0) {
         setLoading(true);
       }
-      const targetId = activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "1");
-      const list = await simulatorApi.getScenarios(targetId);
+      const targetId = activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "0");
+      const list = await simulatorApi.getScenarios(targetId, true);
       setScenarios(list || []);
     } catch (err) {
       console.error("Failed to fetch scenarios:", err);

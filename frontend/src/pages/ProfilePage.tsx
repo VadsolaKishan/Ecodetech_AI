@@ -3,30 +3,38 @@ import { Building, Save, CheckCircle2, MapPin, Users, Clock, Flame, Boxes, Trash
 import { industryApi } from "../services/api";
 import { Industry } from "../types";
 
+const defaultProfile: Partial<Industry> = {
+  company_name: "",
+  industry_type: "Manufacturing",
+  factory_location: "",
+  production_type: "Batch Processing",
+  monthly_production: 100,
+  production_unit: "tonnes",
+  number_of_employees: 50,
+  operating_hours_per_day: 16,
+  main_energy_sources: "Grid electricity, Coal, Diesel",
+  main_raw_materials: "Virgin raw materials",
+  main_waste_types: "Process scrap, packaging waste",
+};
+
 export const ProfilePage: React.FC = () => {
-  const [profile, setProfile] = useState<Partial<Industry>>({
-    company_name: "",
-    industry_type: "Manufacturing",
-    factory_location: "",
-    production_type: "Batch Processing",
-    monthly_production: 100,
-    production_unit: "tonnes",
-    number_of_employees: 50,
-    operating_hours_per_day: 16,
-    main_energy_sources: "Grid electricity, Coal, Diesel",
-    main_raw_materials: "Virgin raw materials",
-    main_waste_types: "Process scrap, packaging waste",
-  });
+  const [profile, setProfile] = useState<Partial<Industry>>(defaultProfile);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const data = await industryApi.getProfile();
-        setProfile(data);
+        setLoading(true);
+        const data = await industryApi.getProfile(true);
+        if (data && typeof data === "object") {
+          setProfile((prev) => ({ ...prev, ...data }));
+        }
       } catch (err) {
-        console.error(err);
+        console.error("Error loading industry profile:", err);
+      } finally {
+        setLoading(false);
       }
     };
     fetchProfile();
@@ -36,15 +44,30 @@ export const ProfilePage: React.FC = () => {
     e.preventDefault();
     try {
       setSaving(true);
-      await industryApi.updateProfile(profile);
+      const updated = await industryApi.updateProfile(profile);
+      if (updated) {
+        setProfile((prev) => ({ ...prev, ...updated }));
+      }
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      setTimeout(() => setSuccess(false), 3500);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to save profile:", err);
+      alert("Failed to save profile. Please ensure all required fields are filled.");
     } finally {
       setSaving(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex-1 p-8 flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-carbon-green border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-xs font-mono text-industrial-400">Loading industrial profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 p-6 lg:p-10 space-y-6 max-w-4xl mx-auto text-white">

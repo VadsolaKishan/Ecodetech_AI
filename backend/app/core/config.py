@@ -1,12 +1,14 @@
 import os
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Union
+import json
+from pydantic import field_validator
 
 load_dotenv()
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "CarbonCopilot AI"
+    PROJECT_NAME: str = "EcoDetect AI"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     
@@ -17,15 +19,29 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./carboncopilot.db")
+    DB_SSLMODE: str = os.getenv("DB_SSLMODE", "")
     
     # CORS
-    CORS_ORIGINS: List[str] = [
+    CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:5173",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",
         "*"
     ]
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            v_str = v.strip()
+            if v_str.startswith("[") and v_str.endswith("]"):
+                try:
+                    return json.loads(v_str)
+                except Exception:
+                    pass
+            return [origin.strip() for origin in v_str.split(",") if origin.strip()]
+        return v
     
     # AI / LLM Configuration (Google Gemini)
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", os.getenv("LLM_API_KEY", ""))

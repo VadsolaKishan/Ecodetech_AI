@@ -81,6 +81,22 @@ def list_users(
         })
     return {"success": True, "data": data}
 
+@router.get("/consultants")
+def list_consultants(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles(UserRole.ADMIN))
+):
+    consultants = db.query(User).filter(
+        (User.role == "sustainability_consultant") | (User.role == "SUSTAINABILITY_CONSULTANT")
+    ).filter(User.is_active == True).all()
+    return {
+        "success": True,
+        "data": [
+            {"id": c.id, "full_name": c.full_name, "email": c.email, "role": c.role}
+            for c in consultants
+        ]
+    }
+
 @router.post("/users")
 def create_user(
     req: AdminUserCreate,
@@ -228,7 +244,7 @@ def assign_consultant(
     admin: User = Depends(require_roles(UserRole.ADMIN))
 ):
     consultant = db.query(User).filter(User.id == req.consultant_id).first()
-    if not consultant or consultant.role != UserRole.SUSTAINABILITY_CONSULTANT:
+    if not consultant or (consultant.role or "").lower() != "sustainability_consultant":
         raise HTTPException(status_code=400, detail="User must have the SUSTAINABILITY_CONSULTANT role")
 
     factory = db.query(Industry).filter(Industry.id == req.industry_id).first()

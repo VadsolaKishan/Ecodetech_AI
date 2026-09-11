@@ -11,6 +11,7 @@ import { AiAssistantModal } from "./components/AiAssistantModal";
 import { LandingPage } from "./pages/LandingPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { AssessmentWizardPage } from "./pages/AssessmentWizardPage";
 import { HotspotsPage } from "./pages/HotspotsPage";
@@ -34,7 +35,7 @@ import { UnauthorizedPage } from "./pages/UnauthorizedPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
-import { dashboardApi, analysisApi, simulatorApi, actionPlanApi, reportApi } from "./services/api";
+import { dashboardApi, analysisApi, simulatorApi, actionPlanApi, reportApi, industryApi } from "./services/api";
 
 const Layout: React.FC<{
   children: React.ReactNode;
@@ -46,7 +47,7 @@ const Layout: React.FC<{
   const location = useLocation();
   const { isReadOnly } = useAuth();
 
-  const isPublic = ["/", "/login", "/register", "/unauthorized", "/forbidden", "/404"].includes(location.pathname);
+  const isPublic = ["/", "/login", "/register", "/forgot-password", "/unauthorized", "/forbidden", "/404"].includes(location.pathname);
 
   if (isPublic) {
     return <>{children}</>;
@@ -88,6 +89,7 @@ function AppRoutes({
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
       <Route path="/forbidden" element={<ForbiddenPage />} />
 
@@ -271,14 +273,14 @@ function AppRoutes({
 }
 
 function MainApp() {
-  const { isAuthenticated, token } = useAuth();
+  const { isAuthenticated, token, user } = useAuth();
   const [activeAssessmentId, setActiveAssessmentId] = useState<number | undefined>(() => {
     const saved = localStorage.getItem("carbon_active_assessment");
-    return saved ? parseInt(saved) : 1;
+    return saved ? parseInt(saved) : undefined;
   });
 
-  const [factoryName, setFactoryName] = useState<string>("Shree Gujarat Textile Works Pvt. Ltd.");
-  const [industryType, setIndustryType] = useState<string>("Textile Manufacturing");
+  const [factoryName, setFactoryName] = useState<string>("");
+  const [industryType, setIndustryType] = useState<string>("");
 
   const prefetchCoreData = (assessmentId: number) => {
     // Non-blocking background prefetch for instantaneous 0ms page navigation
@@ -299,12 +301,24 @@ function MainApp() {
         setActiveAssessmentId(summary.assessment_id);
         localStorage.setItem("carbon_active_assessment", summary.assessment_id.toString());
         prefetchCoreData(summary.assessment_id);
+      } else {
+        setActiveAssessmentId(undefined);
+        localStorage.removeItem("carbon_active_assessment");
       }
       if (summary.factory_name) setFactoryName(summary.factory_name);
       if (summary.industry_type) setIndustryType(summary.industry_type);
     } catch (err) {
       // User may not have created an assessment yet
     }
+
+    // Always fetch industry profile to guarantee exact factory metadata for any logged-in user
+    try {
+      const ind = await industryApi.getProfile();
+      if (ind && ind.company_name) {
+        setFactoryName(ind.company_name);
+        setIndustryType(ind.industry_type || "");
+      }
+    } catch (e) {}
   };
 
   useEffect(() => {
@@ -313,8 +327,12 @@ function MainApp() {
       if (activeAssessmentId) {
         prefetchCoreData(activeAssessmentId);
       }
+    } else {
+      setActiveAssessmentId(undefined);
+      setFactoryName("");
+      setIndustryType("");
     }
-  }, [token, isAuthenticated]);
+  }, [token, isAuthenticated, user?.id]);
 
   const handleAssessmentSelected = (newAssessmentId: number) => {
     setActiveAssessmentId(newAssessmentId);

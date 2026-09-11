@@ -139,8 +139,9 @@ export const AuditLogsPage: React.FC = () => {
                 </tr>
               ) : (
                 filteredLogs.map((log) => {
-                  const roleKey = (log.role || "FACTORY_OWNER") as UserRole;
+                  const roleKey = ((log.role || "FACTORY_OWNER").toUpperCase()) as UserRole;
                   const colors = ROLE_BADGE_COLORS[roleKey] || ROLE_BADGE_COLORS.FACTORY_OWNER;
+                  const label = ROLE_LABELS[roleKey] || log.role || "SYSTEM";
 
                   return (
                     <tr key={log.id} className="hover:bg-industrial-800/30 transition-colors">
@@ -152,7 +153,7 @@ export const AuditLogsPage: React.FC = () => {
                       </td>
                       <td className="py-3 px-4">
                         <span className={`px-2 py-0.5 rounded border text-[11px] font-semibold ${colors.bg} ${colors.text} ${colors.border}`}>
-                          {log.role || "SYSTEM"}
+                          {label}
                         </span>
                       </td>
                       <td className="py-3 px-4 font-bold text-carbon-green">

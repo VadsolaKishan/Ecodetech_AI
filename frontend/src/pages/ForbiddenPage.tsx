@@ -18,7 +18,7 @@ export const ForbiddenPage: React.FC<{ message?: string }> = ({ message }) => {
         </span>
         <h1 className="text-2xl font-bold text-white mt-4 mb-2">Access Denied</h1>
         <p className="text-slate-400 text-sm mb-4 leading-relaxed">
-          {message || "Your current account role does not have authorization to view or modify this resource under the CarbonCopilot RBAC security policy."}
+          {message || "Your current account role does not have authorization to view or modify this resource under the EcoDetect AI RBAC security policy."}
         </p>
 
         <div className="bg-industrial-950/80 border border-industrial-800 rounded-xl p-3 mb-6 flex items-center justify-between text-xs font-mono">

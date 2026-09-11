@@ -48,9 +48,19 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ activeAssessmentId }) 
     fetchReport();
   }, [assessmentId, activeAssessmentId]);
 
-  const handleDownloadPdf = () => {
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
     const targetId = assessmentId || activeAssessmentId || 1;
-    window.open(reportApi.getPdfDownloadUrl(targetId), "_blank");
+    setDownloadingPdf(true);
+    try {
+      await reportApi.downloadPdf(targetId);
+    } catch (err) {
+      console.error("Direct PDF download failed, trying link fallback", err);
+      window.open(reportApi.getPdfDownloadUrl(targetId), "_blank");
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
 
   const handlePrint = () => {
@@ -101,10 +111,11 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ activeAssessmentId }) 
           </button>
           <button
             onClick={handleDownloadPdf}
-            className="px-4 py-2 rounded-xl bg-carbon-green text-industrial-950 hover:bg-carbon-lime text-xs font-bold flex items-center space-x-1.5 transition-all shadow-glow-green"
+            disabled={downloadingPdf}
+            className="px-4 py-2 rounded-xl bg-carbon-green text-industrial-950 hover:bg-carbon-lime text-xs font-bold flex items-center space-x-1.5 transition-all shadow-glow-green disabled:opacity-50"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>Download Official PDF</span>
+            <Download className={`w-3.5 h-3.5 ${downloadingPdf ? 'animate-bounce' : ''}`} />
+            <span>{downloadingPdf ? "Generating PDF..." : "Download Official PDF"}</span>
           </button>
         </div>
       </div>
@@ -116,7 +127,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ activeAssessmentId }) 
           <div>
             <div className="flex items-center space-x-2 mb-1">
               <span className="text-xs font-mono text-carbon-green print:text-emerald-700 font-bold uppercase">
-                CARBONCOPILOT AI
+                ECODETECT AI
               </span>
               <span className="text-xs text-industrial-400 print:text-gray-500">• Official Verification Report</span>
             </div>

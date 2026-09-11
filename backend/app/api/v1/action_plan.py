@@ -5,7 +5,7 @@ from app.database.session import get_db
 from app.models.models import ActionPlan, Assessment, User
 from app.schemas.schemas import ActionPlanCreate, ActionPlanUpdate, ActionPlanOut, ApiResponse
 from app.core.roles import UserRole, AuditEvent
-from app.api.deps import get_current_user, require_roles, verify_assessment_access
+from app.api.deps import get_current_user, require_roles, verify_assessment_access, resolve_accessible_assessment
 from app.services.audit_service import log_audit_event
 
 router = APIRouter()
@@ -17,8 +17,11 @@ def get_action_plans(
     current_user: User = Depends(get_current_user)
 ):
     if assessment_id:
-        verify_assessment_access(db, current_user, assessment_id, read_only=True)
-        query = db.query(ActionPlan).filter(ActionPlan.assessment_id == assessment_id)
+        assessment = resolve_accessible_assessment(db, current_user, assessment_id)
+        if assessment:
+            query = db.query(ActionPlan).filter(ActionPlan.assessment_id == assessment.id)
+        else:
+            query = db.query(ActionPlan).filter(ActionPlan.user_id == current_user.id)
     else:
         # Fallback to all action plans accessible to user
         user_role = (current_user.role or "").lower()
@@ -42,11 +45,14 @@ def create_action_plan(
     current_user: User = Depends(require_roles(UserRole.FACTORY_OWNER, UserRole.SUSTAINABILITY_CONSULTANT, UserRole.ADMIN))
 ):
     # Enforce write access (blocks Regulator)
-    assessment = verify_assessment_access(db, current_user, assessment_id, read_only=False)
+    assessment = resolve_accessible_assessment(db, current_user, assessment_id, read_only=False)
+    if not assessment:
+        raise HTTPException(status_code=404, detail="No active assessment found to attach action plan")
 
+    actual_id = assessment.id
     item = ActionPlan(
         user_id=current_user.id,
-        assessment_id=assessment_id,
+        assessment_id=actual_id,
         recommendation_id=action_in.recommendation_id,
         title=action_in.title,
         category=action_in.category,

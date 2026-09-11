@@ -14,9 +14,10 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from "recharts";
+import { Link } from "react-router-dom";
 import confetti from "canvas-confetti";
 import { simulatorApi, dashboardApi } from "../services/api";
-import { SimulatorResult } from "../types";
+import { SimulatorResult, Scenario } from "../types";
 
 interface SimulatorPageProps {
   activeAssessmentId?: number;
@@ -24,7 +25,8 @@ interface SimulatorPageProps {
 
 export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId }) => {
   const [assessmentId, setAssessmentId] = useState<number | null>(() => {
-    return activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "1");
+    const saved = localStorage.getItem("carbon_active_assessment");
+    return activeAssessmentId || (saved ? parseInt(saved) : null);
   });
 
   // Sliders State
@@ -38,6 +40,8 @@ export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId
   const [scenarioName, setScenarioName] = useState("");
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedScenarios, setSavedScenarios] = useState<Scenario[]>([]);
 
   // Update active assessment if prop changes
   useEffect(() => {
@@ -46,12 +50,28 @@ export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId
     }
   }, [activeAssessmentId]);
 
+  const fetchSavedScenarios = async (idToUse?: number) => {
+    try {
+      const targetId = idToUse || assessmentId || activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "0");
+      const list = await simulatorApi.getScenarios(targetId, true);
+      if (list && Array.isArray(list)) {
+        setSavedScenarios(list.filter((s) => (s.id ?? 0) > 0));
+      }
+    } catch (e) {
+      console.error("Failed to load saved scenarios:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchSavedScenarios();
+  }, [assessmentId, activeAssessmentId]);
+
   // Recalculate simulation on slider change
   const runSimulation = async () => {
-    if (!assessmentId) return;
+    const targetId = assessmentId || activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "0");
     try {
       setLoading(true);
-      const res = await simulatorApi.calculate(assessmentId, {
+      const res = await simulatorApi.calculate(targetId, {
         solar_percentage: solarPct,
         recycled_material_percentage: recycledPct,
         waste_recovery_percentage: wasteRecPct,
@@ -67,13 +87,18 @@ export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId
 
   useEffect(() => {
     runSimulation();
-  }, [assessmentId, solarPct, recycledPct, wasteRecPct, transportRedPct]);
+  }, [assessmentId, activeAssessmentId, solarPct, recycledPct, wasteRecPct, transportRedPct]);
 
   const handleSaveScenario = async () => {
-    if (!assessmentId || !simResult) return;
+    const targetId = assessmentId || activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "0");
+    if (!simResult) {
+      alert("Please wait for simulation results to compute before saving.");
+      return;
+    }
     try {
-      await simulatorApi.saveScenario(assessmentId, {
-        name: scenarioName || `Scenario ${solarPct}% Solar + ${recycledPct}% Recycled`,
+      setSaving(true);
+      await simulatorApi.saveScenario(targetId, {
+        name: scenarioName.trim() || `Scenario ${solarPct}% Solar + ${recycledPct}% Recycled`,
         solar_percentage: solarPct,
         recycled_material_percentage: recycledPct,
         waste_recovery_percentage: wasteRecPct,
@@ -87,8 +112,12 @@ export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId
       });
       setTimeout(() => setSavedSuccess(false), 3500);
       setScenarioName("");
-    } catch (err) {
-      console.error(err);
+      fetchSavedScenarios(targetId);
+    } catch (err: any) {
+      console.error("Failed to save scenario:", err);
+      alert(err.response?.data?.detail || "Failed to save scenario. Please check your inputs.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -128,19 +157,28 @@ export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId
           />
           <button
             onClick={handleSaveScenario}
-            disabled={!simResult}
-            className="px-4 py-2 rounded-xl bg-carbon-green text-industrial-950 hover:bg-carbon-lime text-xs font-bold flex items-center space-x-1.5 transition-all shadow-glow-green"
+            disabled={!simResult || saving}
+            className="px-4 py-2 rounded-xl bg-carbon-green text-industrial-950 hover:bg-carbon-lime text-xs font-bold flex items-center space-x-1.5 transition-all shadow-glow-green disabled:opacity-50"
           >
             <Save className="w-3.5 h-3.5" />
-            <span>Save Scenario</span>
+            <span>{saving ? "Saving..." : "Save Scenario"}</span>
           </button>
         </div>
       </div>
 
       {savedSuccess && (
-        <div className="p-3 bg-carbon-green/20 border border-carbon-green text-carbon-green rounded-xl text-xs flex items-center space-x-2 shadow-glow-green animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4" />
-          <span>Scenario successfully saved to your Scenario Matrix comparison!</span>
+        <div className="p-3 bg-carbon-green/20 border border-carbon-green text-carbon-green rounded-xl text-xs flex items-center justify-between shadow-glow-green animate-in fade-in">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4" />
+            <span>Scenario successfully saved to your Scenario Matrix comparison!</span>
+          </div>
+          <Link
+            to="/scenarios"
+            className="text-xs font-bold underline hover:text-white flex items-center gap-1"
+          >
+            <span>View in Matrix</span>
+            <ArrowRight className="w-3 h-3" />
+          </Link>
         </div>
       )}
 
@@ -365,6 +403,56 @@ export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId
           )}
         </div>
       </div>
+
+      {/* Saved Facility Scenarios Section */}
+      {savedScenarios.length > 0 && (
+        <div className="p-6 rounded-2xl bg-industrial-900/90 border border-industrial-800 shadow-card-dark space-y-4 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-industrial-800">
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-carbon-green" />
+                <span>Saved Facility Scenarios ({savedScenarios.length})</span>
+              </h3>
+              <p className="text-xs text-industrial-400">Custom simulated decarbonization pathways saved for this facility.</p>
+            </div>
+            <Link
+              to="/scenarios"
+              className="px-3.5 py-1.5 rounded-xl bg-industrial-800 hover:bg-industrial-700 text-carbon-green text-xs font-semibold flex items-center gap-1.5 border border-industrial-700 hover:border-carbon-green transition"
+            >
+              <span>Compare All in Roadmap</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {savedScenarios.map((s, idx) => (
+              <div key={s.id ?? idx} className="p-4 rounded-xl bg-industrial-950/80 border border-industrial-800 space-y-2.5 hover:border-industrial-700 transition">
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="text-xs font-bold text-white line-clamp-1">{s.name}</h4>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-carbon-green/20 text-carbon-green font-bold shrink-0">
+                    ↓{s.reduction_percentage}%
+                  </span>
+                </div>
+                <p className="text-[11px] text-industrial-400 line-clamp-1">{s.description}</p>
+                <div className="grid grid-cols-3 gap-2 text-[11px] font-mono text-industrial-400 pt-2 border-t border-industrial-850">
+                  <div>
+                    <span className="text-industrial-500 block text-[9px]">Emissions</span>
+                    <span className="text-white font-bold">{s.result_co2e_tonnes} t</span>
+                  </div>
+                  <div>
+                    <span className="text-industrial-500 block text-[9px]">Annual Savings</span>
+                    <span className="text-carbon-lime font-bold">₹{(s.annual_savings_inr / 100000).toFixed(1)}L</span>
+                  </div>
+                  <div>
+                    <span className="text-industrial-500 block text-[9px]">Circularity</span>
+                    <span className="text-carbon-green font-bold">{s.circularity_score}/100</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -29,15 +29,16 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ active
   const [activeModalRec, setActiveModalRec] = useState<Recommendation | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [addingId, setAddingId] = useState<number | null>(null);
 
   const fetchRecs = async () => {
     try {
       if (recommendations.length === 0) {
         setLoading(true);
       }
-      const targetId = activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "1");
-      const data = await analysisApi.getRecommendations(targetId);
-      if (data) {
+      const targetId = activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "0");
+      const data = await analysisApi.getRecommendations(targetId, true);
+      if (data && Array.isArray(data)) {
         setRecommendations(data);
       }
     } catch (err) {
@@ -52,9 +53,10 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ active
   }, [activeAssessmentId]);
 
   const handleAddToActionPlan = async (rec: Recommendation) => {
-    if (!rec.assessment_id) return;
+    const targetId = rec.assessment_id || activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "0");
     try {
-      await actionPlanApi.create(rec.assessment_id, {
+      setAddingId(rec.id);
+      await actionPlanApi.create(targetId, {
         recommendation_id: rec.id,
         title: rec.title,
         category: rec.category,
@@ -65,8 +67,11 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ active
       });
       setToastMsg(`Successfully added "${rec.title.slice(0, 32)}..." to Action Plan!`);
       setTimeout(() => setToastMsg(null), 3500);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error("Failed to add to action plan:", err);
+      alert(err.response?.data?.detail || "Failed to add to Action Plan. Please try again.");
+    } finally {
+      setAddingId(null);
     }
   };
 
@@ -182,10 +187,10 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ active
                   </div>
                 </div>
 
-                {/* Why CarbonCopilot Recommends this */}
+                {/* Why EcoDetect Recommends this */}
                 <div className="p-3.5 rounded-xl bg-industrial-950/40 border border-industrial-800 text-xs leading-relaxed text-industrial-300 mb-4">
                   <span className="text-carbon-green font-semibold block text-[11px] mb-1">
-                    Why CarbonCopilot recommends this:
+                    Why EcoDetect recommends this:
                   </span>
                   {r.reason}
                 </div>
@@ -213,11 +218,12 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ active
 
                   <button
                     type="button"
+                    disabled={addingId === r.id}
                     onClick={() => handleAddToActionPlan(r)}
-                    className="px-3 py-1.5 rounded-lg bg-carbon-green text-industrial-950 hover:bg-carbon-lime text-xs font-bold flex items-center gap-1 transition-all shadow-glow-green"
+                    className="px-3 py-1.5 rounded-lg bg-carbon-green text-industrial-950 hover:bg-carbon-lime text-xs font-bold flex items-center gap-1 transition-all shadow-glow-green disabled:opacity-50"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Add to Action Plan</span>
+                    <span>{addingId === r.id ? "Adding..." : "Add to Action Plan"}</span>
                   </button>
                 </div>
               </div>

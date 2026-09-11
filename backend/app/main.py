@@ -25,8 +25,8 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(
-    title="CarbonCopilot AI API",
-    description="Industrial Emission Leak-Point Detector & Circular Alternative Recommender (HackOut'26)",
+    title="EcoDetect AI API",
+    description="Industrial Emission & Ecological Leak-Point Detector & Circular Alternative Recommender",
     version="1.0.0",
     lifespan=lifespan,
     docs_url="/docs",
@@ -58,7 +58,7 @@ app.include_router(admin_router, prefix=f"{api_v1}/admin", tags=["Admin & RBAC M
 @app.get("/")
 def root():
     return {
-        "app": "CarbonCopilot AI",
+        "app": "EcoDetect AI",
         "tagline": "Detect. Recommend. Simulate. Reduce.",
         "version": "1.0.0",
         "status": "operational",
@@ -68,7 +68,7 @@ def root():
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "service": "CarbonCopilot Backend"}
+    return {"status": "healthy", "service": "EcoDetect AI Backend"}
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Leaf, Lock, Mail, ArrowRight, AlertCircle, Shield } from "lucide-react";
+import { Lock, Mail, ArrowRight, AlertCircle, Shield } from "lucide-react";
+import { EcoDetectLogo } from "../components/EcoDetectLogo";
 import { useAuth } from "../context/AuthContext";
 
 export const LoginPage: React.FC = () => {
@@ -23,7 +24,11 @@ export const LoginPage: React.FC = () => {
       await login(email, password);
       redirectByRole();
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Invalid email or password");
+      setError(
+        err.response?.data?.error?.message ||
+        err.response?.data?.detail ||
+        "Invalid email or password"
+      );
     } finally {
       setLoading(false);
     }
@@ -34,13 +39,9 @@ export const LoginPage: React.FC = () => {
       <div className="w-full max-w-md bg-industrial-900/90 border border-industrial-700/80 rounded-2xl p-8 shadow-2xl backdrop-blur-xl space-y-6">
         {/* Brand */}
         <div className="flex flex-col items-center text-center">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-carbon-emerald via-carbon-green to-carbon-lime p-0.5 shadow-glow-green mb-3">
-            <div className="w-full h-full bg-industrial-950 rounded-[10px] flex items-center justify-center">
-              <Leaf className="w-6 h-6 text-carbon-green" />
-            </div>
-          </div>
-          <h2 className="text-xl font-bold tracking-tight text-white font-mono">CARBONCOPILOT AI</h2>
-          <p className="text-xs text-industrial-400 mt-1">Industrial Emission Copilot & Decarbonization Platform</p>
+          <EcoDetectLogo size="lg" className="mb-3" />
+          <h2 className="text-xl font-bold tracking-tight text-white font-mono">ECODETECT AI</h2>
+          <p className="text-xs text-industrial-400 mt-1">Industrial Ecological Intelligence &amp; Decarbonization Platform</p>
         </div>
 
         {/* Quick Demo Role Select */}
@@ -98,6 +99,13 @@ export const LoginPage: React.FC = () => {
 
         {/* Standard Login Form */}
         <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
+          {error && (
+            <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/40 text-red-300 text-xs flex items-center space-x-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              <span className="font-medium">{error}</span>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-medium text-industrial-300 mb-1">Work Email</label>
             <div className="relative">
@@ -106,7 +114,10 @@ export const LoginPage: React.FC = () => {
                 type="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (error) setError("");
+                }}
                 placeholder="plant.manager@factory.com"
                 autoComplete="off"
                 className="w-full bg-industrial-950 border border-industrial-700 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-industrial-500 focus:outline-none focus:border-carbon-green"
@@ -115,14 +126,25 @@ export const LoginPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-industrial-300 mb-1">Password</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-medium text-industrial-300">Password</label>
+              <Link
+                to="/forgot-password"
+                className="text-[11px] text-carbon-green hover:text-carbon-lime hover:underline transition-colors"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <div className="relative">
               <Lock className="w-4 h-4 text-industrial-500 absolute left-3 top-3" />
               <input
                 type="password"
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) setError("");
+                }}
                 placeholder="••••••••"
                 autoComplete="new-password"
                 className="w-full bg-industrial-950 border border-industrial-700 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-industrial-500 focus:outline-none focus:border-carbon-green"

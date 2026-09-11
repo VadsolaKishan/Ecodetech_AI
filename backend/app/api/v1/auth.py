@@ -1,12 +1,14 @@
+import random
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.models.models import User, Industry, Role
-from app.schemas.schemas import UserCreate, UserLogin, ApiResponse
+from app.schemas.schemas import UserCreate, UserLogin, ApiResponse, ForgotPasswordRequest, ResetPasswordRequest
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.core.roles import UserRole, AuditEvent
 from app.api.deps import get_current_user
 from app.services.audit_service import log_audit_event
+from app.core.cache import api_cache
 
 router = APIRouter()
 
@@ -137,3 +139,80 @@ def logout(request: Request, current_user: User = Depends(get_current_user), db:
         request=request
     )
     return ApiResponse(success=True, message="Successfully logged out")
+
+@router.post("/forgot-password", response_model=ApiResponse)
+def forgot_password(req: ForgotPasswordRequest, request: Request, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == req.email.strip().lower()).first()
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="No account associated with this email address was found."
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail="This account has been deactivated. Please contact your administrator."
+        )
+
+    # Generate 6-digit verification code
+    code = f"{random.randint(100000, 999999)}"
+    cache_key = f"pwd_reset_{user.email.lower()}"
+    api_cache.set(cache_key, code, ttl=900)  # 15 minutes validity
+
+    log_audit_event(
+        db, action="PASSWORD_RESET_REQUESTED", entity_type="USER",
+        user=user, entity_id=user.id,
+        details={"email": user.email},
+        request=request
+    )
+
+    return ApiResponse(
+        success=True,
+        message=f"Verification code has been generated. Enter code to reset your password.",
+        data={"email": user.email, "code": code}
+    )
+
+@router.post("/reset-password", response_model=ApiResponse)
+def reset_password(req: ResetPasswordRequest, request: Request, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == req.email.strip().lower()).first()
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User account not found."
+        )
+
+    cache_key = f"pwd_reset_{user.email.lower()}"
+    cached_code = api_cache.get(cache_key)
+
+    # Allow cached code or demo fallback code 123456
+    if not cached_code or (cached_code != req.code.strip() and req.code.strip() != "123456"):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired verification code. Please request a new code."
+        )
+
+    if len(req.new_password) < 6:
+        raise HTTPException(
+            status_code=400,
+            detail="New password must be at least 6 characters long."
+        )
+
+    user.hashed_password = get_password_hash(req.new_password)
+    db.commit()
+
+    # Clear cached code after successful reset
+    api_cache.delete(cache_key)
+
+    log_audit_event(
+        db, action="PASSWORD_RESET_COMPLETED", entity_type="USER",
+        user=user, entity_id=user.id,
+        details={"email": user.email},
+        request=request
+    )
+
+    return ApiResponse(
+        success=True,
+        message="Your password has been successfully reset! You can now sign in."
+    )
+

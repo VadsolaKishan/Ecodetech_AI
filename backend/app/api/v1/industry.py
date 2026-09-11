@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.database.session import get_db
-from app.models.models import Industry, User, FactoryAssignment
+from app.models.models import Industry, User, FactoryAssignment, Factory
 from app.schemas.schemas import IndustryCreate, IndustryUpdate, IndustryOut, ApiResponse
 from app.core.roles import UserRole, AuditEvent
 from app.api.deps import get_current_user, require_roles, verify_factory_access
@@ -101,6 +101,29 @@ def update_industry_profile(
 
     db.commit()
     db.refresh(industry)
+
+    # Automatically keep factories table in sync with industry profile
+    factory = db.query(Factory).filter(Factory.industry_id == industry.id).first()
+    if not factory:
+        factory = Factory(
+            industry_id=industry.id,
+            owner_id=industry.user_id or current_user.id,
+            name=industry.company_name,
+            location=industry.factory_location,
+            sector=industry.industry_type
+        )
+        db.add(factory)
+        db.commit()
+        db.refresh(factory)
+    else:
+        factory.name = industry.company_name
+        factory.location = industry.factory_location
+        factory.sector = industry.industry_type
+        db.commit()
+
+    if not current_user.factory_id:
+        current_user.factory_id = factory.id
+        db.commit()
 
     log_audit_event(
         db, action="FACTORY_PROFILE_UPDATED", entity_type="INDUSTRY",

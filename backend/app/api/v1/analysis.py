@@ -4,7 +4,7 @@ from app.database.session import get_db
 from app.models.models import Assessment, EmissionResult, EmissionHotspot, Recommendation, User
 from app.schemas.schemas import ApiResponse, EmissionResultOut, HotspotOut, RecommendationOut
 from app.core.roles import UserRole, AuditEvent
-from app.api.deps import get_current_user, require_roles, verify_assessment_access
+from app.api.deps import get_current_user, require_roles, verify_assessment_access, resolve_accessible_assessment
 from app.services.carbon_calculator import CarbonCalculationEngine
 from app.services.hotspot_detector import HotspotDetectionEngine
 from app.services.recommendation_engine import RecommendationEngine
@@ -74,23 +74,27 @@ def get_emissions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    cache_key = f"emissions_{assessment_id}"
+    assessment = resolve_accessible_assessment(db, current_user, assessment_id)
+    if not assessment:
+        return ApiResponse(success=True, data={"assessment_id": None, "total_emissions_tco2e": 0, "scope1_tco2e": 0, "scope2_tco2e": 0, "scope3_tco2e": 0, "results": []})
+
+    actual_id = assessment.id
+    cache_key = f"emissions_{actual_id}"
     cached = api_cache.get(cache_key)
     if cached:
         return ApiResponse(success=True, data=cached)
 
-    assessment = verify_assessment_access(db, current_user, assessment_id, read_only=True)
-    results = db.query(EmissionResult).filter(EmissionResult.assessment_id == assessment_id).all()
+    results = db.query(EmissionResult).filter(EmissionResult.assessment_id == actual_id).all()
 
     data = {
-        "assessment_id": assessment_id,
+        "assessment_id": actual_id,
         "total_emissions_tco2e": assessment.total_emissions_tco2e,
         "scope1_tco2e": assessment.scope1_tco2e,
         "scope2_tco2e": assessment.scope2_tco2e,
         "scope3_tco2e": assessment.scope3_tco2e,
         "results": [EmissionResultOut.from_orm(r).dict() for r in results]
     }
-    api_cache.set(cache_key, data, ttl=120, tags=[f"assessment_{assessment_id}"])
+    api_cache.set(cache_key, data, ttl=120, tags=[f"assessment_{actual_id}"])
     return ApiResponse(success=True, data=data)
 
 @router.get("/assessments/{assessment_id}/hotspots", response_model=ApiResponse)
@@ -99,15 +103,19 @@ def get_hotspots(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    cache_key = f"hotspots_{assessment_id}"
+    assessment = resolve_accessible_assessment(db, current_user, assessment_id)
+    if not assessment:
+        return ApiResponse(success=True, data=[])
+
+    actual_id = assessment.id
+    cache_key = f"hotspots_{actual_id}"
     cached = api_cache.get(cache_key)
     if cached:
         return ApiResponse(success=True, data=cached)
 
-    verify_assessment_access(db, current_user, assessment_id, read_only=True)
-    hotspots = db.query(EmissionHotspot).filter(EmissionHotspot.assessment_id == assessment_id).order_by(EmissionHotspot.percentage_contribution.desc()).all()
+    hotspots = db.query(EmissionHotspot).filter(EmissionHotspot.assessment_id == actual_id).order_by(EmissionHotspot.percentage_contribution.desc()).all()
     data = [HotspotOut.from_orm(h).dict() for h in hotspots]
-    api_cache.set(cache_key, data, ttl=120, tags=[f"assessment_{assessment_id}"])
+    api_cache.set(cache_key, data, ttl=120, tags=[f"assessment_{actual_id}"])
     return ApiResponse(success=True, data=data)
 
 @router.get("/assessments/{assessment_id}/recommendations", response_model=ApiResponse)
@@ -116,13 +124,17 @@ def get_recommendations(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    cache_key = f"recs_{assessment_id}"
+    assessment = resolve_accessible_assessment(db, current_user, assessment_id)
+    if not assessment:
+        return ApiResponse(success=True, data=[])
+
+    actual_id = assessment.id
+    cache_key = f"recs_{actual_id}"
     cached = api_cache.get(cache_key)
     if cached:
         return ApiResponse(success=True, data=cached)
 
-    verify_assessment_access(db, current_user, assessment_id, read_only=True)
-    recs = db.query(Recommendation).filter(Recommendation.assessment_id == assessment_id).order_by(Recommendation.priority_rank.asc()).all()
+    recs = db.query(Recommendation).filter(Recommendation.assessment_id == actual_id).order_by(Recommendation.priority_rank.asc()).all()
     data = [RecommendationOut.from_orm(r).dict() for r in recs]
-    api_cache.set(cache_key, data, ttl=120, tags=[f"assessment_{assessment_id}"])
+    api_cache.set(cache_key, data, ttl=120, tags=[f"assessment_{actual_id}"])
     return ApiResponse(success=True, data=data)

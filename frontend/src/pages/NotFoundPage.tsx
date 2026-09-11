@@ -14,7 +14,7 @@ export const NotFoundPage: React.FC = () => {
         </span>
         <h1 className="text-2xl font-bold text-white mt-4 mb-2">Page Not Found</h1>
         <p className="text-slate-400 text-sm mb-6 leading-relaxed">
-          The requested operational module or route does not exist in the CarbonCopilot platform registry.
+          The requested operational module or route does not exist in the EcoDetect AI platform registry.
         </p>
         <Link
           to="/dashboard"

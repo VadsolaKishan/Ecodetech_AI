@@ -20,6 +20,14 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    code: str
+    new_password: str = Field(..., min_length=6)
+
 class UserOut(BaseModel):
     id: int
     email: EmailStr
@@ -79,6 +87,7 @@ class MaterialInputItem(BaseModel):
     virgin_percentage: float = 100.0
     recycled_percentage: float = 0.0
     supplier_distance_km: float = 100.0
+    notes: Optional[str] = None
 
 class WasteInputItem(BaseModel):
     waste_type: str # Organic, Plastic/Packaging, Ash/Slag, Hazardous, Scrap Metal, General Mixed
@@ -87,6 +96,7 @@ class WasteInputItem(BaseModel):
     disposal_method: str = "landfill" # landfill, recycling, composting, incineration, byproduct_reuse
     recyclable_percentage: float = 0.0
     current_treatment: Optional[str] = None
+    notes: Optional[str] = None
 
 class TransportInputItem(BaseModel):
     transport_mode: str = "heavy_truck" # heavy_truck, medium_truck, rail, electric_van
@@ -134,6 +144,7 @@ class HotspotOut(BaseModel):
 
 class RecommendationOut(BaseModel):
     id: int
+    assessment_id: Optional[int] = None
     recommendation_key: str
     title: str
     category: str

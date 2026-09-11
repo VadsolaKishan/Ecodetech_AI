@@ -120,6 +120,14 @@ export const authApi = {
   getMe: async () => {
     return cachedGet<User>("/auth/me", undefined, { ttlMs: 30000 });
   },
+  forgotPassword: async (email: string) => {
+    const res = await apiClient.post("/auth/forgot-password", { email });
+    return res.data;
+  },
+  resetPassword: async (data: { email: string; code: string; new_password: string }) => {
+    const res = await apiClient.post("/auth/reset-password", data);
+    return res.data;
+  },
   logout: () => {
     localStorage.removeItem("carbon_token");
     localStorage.removeItem("carbon_user");
@@ -237,7 +245,22 @@ export const reportApi = {
     return cachedGet(`/reports/${assessmentId}`, undefined, { forceRefresh, ttlMs: 120000 });
   },
   getPdfDownloadUrl: (assessmentId: number) => {
-    return `${API_BASE_URL}/reports/${assessmentId}/pdf`;
+    const token = localStorage.getItem("carbon_token");
+    return `${API_BASE_URL}/reports/${assessmentId}/pdf${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+  },
+  downloadPdf: async (assessmentId: number) => {
+    const res = await apiClient.get(`/reports/${assessmentId}/pdf`, {
+      responseType: "blob",
+    });
+    const blob = new Blob([res.data], { type: "application/pdf" });
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.setAttribute("download", `EcoDetect_Report_${assessmentId}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(downloadUrl);
   },
 };
 
@@ -277,6 +300,9 @@ export const adminApi = {
   },
   getIndustries: async (forceRefresh = false) => {
     return cachedGet<any[]>("/admin/industries", undefined, { forceRefresh, ttlMs: 60000 });
+  },
+  getConsultants: async (forceRefresh = false) => {
+    return cachedGet<AdminUserItem[]>("/admin/consultants", undefined, { forceRefresh, ttlMs: 60000 });
   },
   assignConsultant: async (consultantId: number, industryId: number) => {
     const res = await apiClient.post("/admin/industries/assign-consultant", {

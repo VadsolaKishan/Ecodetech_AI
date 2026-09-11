@@ -8,6 +8,7 @@ import {
   Shield,
   ChevronDown
 } from "lucide-react";
+import { EcoDetectLogo } from "./EcoDetectLogo";
 import { useAuth } from "../context/AuthContext";
 import { ROLE_LABELS, ROLE_BADGE_COLORS, UserRole } from "../types/roles";
 
@@ -33,17 +34,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAssistant, factoryName, in
       {/* Brand Logo */}
       <div className="flex items-center space-x-3">
         <Link to="/dashboard" className="flex items-center space-x-2.5 group">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-carbon-emerald via-carbon-green to-carbon-lime p-0.5 shadow-glow-green group-hover:scale-105 transition-transform">
-            <div className="w-full h-full bg-industrial-950 rounded-[10px] flex items-center justify-center">
-              <Leaf className="w-5 h-5 text-carbon-green animate-pulse-slow" />
-            </div>
-          </div>
+          <EcoDetectLogo size="md" />
           <div>
             <div className="flex items-center space-x-1.5">
-              <span className="font-bold tracking-tight text-white font-mono text-base">CARBONCOPILOT</span>
+              <span className="font-bold tracking-tight text-white font-mono text-base">ECODETECT</span>
               <span className="bg-carbon-green/20 text-carbon-green text-[10px] font-mono px-1.5 py-0.5 rounded font-bold border border-carbon-green/40">AI</span>
             </div>
-            <p className="text-[10px] text-industrial-400 font-mono tracking-wider uppercase">Industrial Emission Copilot</p>
+            <p className="text-[10px] text-industrial-400 font-mono tracking-wider uppercase">Industrial Ecological Intelligence</p>
           </div>
         </Link>
       </div>

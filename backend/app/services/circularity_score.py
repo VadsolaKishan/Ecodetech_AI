@@ -70,6 +70,6 @@ class CircularityScoringEngine:
             "logistics_points": transport_pts,
             "max_possible": 100.0,
             "rating": "Advanced Circular" if total_score >= 70 else ("Emerging Circular" if total_score >= 40 else "Linear Economy Risk"),
-            "methodology": "CarbonCopilot Circularity Index: Weighted synthesis of Energy Transition (25%), Feedstock Circularity (30%), Waste Divergence (30%), and Supply Chain Locality (15%)."
+            "methodology": "EcoDetect Circularity Index: Weighted synthesis of Energy Transition (25%), Feedstock Circularity (30%), Waste Divergence (30%), and Supply Chain Locality (15%)."
         }
         return breakdown

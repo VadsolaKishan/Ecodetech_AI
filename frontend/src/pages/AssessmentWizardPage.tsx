@@ -126,10 +126,15 @@ export const AssessmentWizardPage: React.FC<AssessmentWizardPageProps> = ({ onAs
       };
 
       const result = await assessmentApi.create(payload);
-      onAssessmentCreated(result.id);
-      navigate("/dashboard");
-    } catch (err) {
+      if (result && result.id) {
+        onAssessmentCreated(result.id);
+        navigate("/hotspots");
+      } else {
+        navigate("/dashboard");
+      }
+    } catch (err: any) {
       console.error("Failed to run assessment", err);
+      alert(err.response?.data?.detail || "Failed to run carbon assessment. Please verify your inputs.");
       setAnalyzing(false);
     }
   };

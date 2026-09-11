@@ -32,6 +32,9 @@ class SimpleTtlCache:
             if key in self._cache:
                 del self._cache[key]
 
+    def delete(self, key: str) -> None:
+        self.invalidate(key)
+
     def invalidate_by_tag(self, tag: str) -> None:
         with self._lock:
             keys_to_delete = [

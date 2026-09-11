@@ -3,13 +3,12 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import NullPool
 from app.core.config import settings
 
-connect_args = {}
-engine_kwargs = {"echo": False}
+engine_kwargs = {"echo": False, "pool_pre_ping": True}
 
 db_url = settings.DATABASE_URL
 
 if db_url.startswith("sqlite"):
-    connect_args = {"check_same_thread": False}
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
 else:
     # Neon PostgreSQL serverless connection
     # Strip channel_binding=require if present to prevent pgbouncer SSL eof
@@ -18,16 +17,32 @@ else:
         if db_url.endswith("?"):
             db_url = db_url[:-1]
 
-    # Neon PgBouncer pooler works best with NullPool or aggressive recycle
+    # PgBouncer / Neon works best with NullPool
     engine_kwargs["poolclass"] = NullPool
-    engine_kwargs["connect_args"] = {
+    
+    pg_connect_args = {
         "connect_timeout": 20,
-        "sslmode": "require",
         "keepalives": 1,
         "keepalives_idle": 30,
         "keepalives_interval": 10,
         "keepalives_count": 5
     }
+
+    # Determine SSL mode:
+    # - If DB_SSLMODE is set, use it
+    # - If neon.tech or sslmode=require in URL, require SSL
+    # - For local / docker postgres without SSL, do not force require
+    ssl_mode = settings.DB_SSLMODE or ""
+    if not ssl_mode:
+        if "neon.tech" in db_url or "sslmode=require" in db_url:
+            ssl_mode = "require"
+        elif "localhost" in db_url or "@postgres:" in db_url or "127.0.0.1" in db_url:
+            ssl_mode = "prefer"
+
+    if ssl_mode:
+        pg_connect_args["sslmode"] = ssl_mode
+
+    engine_kwargs["connect_args"] = pg_connect_args
 
 engine = create_engine(
     db_url,

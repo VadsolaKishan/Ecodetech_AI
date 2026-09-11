@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.database.session import get_db
@@ -12,17 +12,19 @@ from app.models.models import (
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 def get_current_user(
+    request: Request,
     db: Session = Depends(get_db),
     token: Optional[str] = Depends(oauth2_scheme)
 ) -> User:
-    if not token:
+    effective_token = token or request.query_params.get("token")
+    if not effective_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication credentials were not provided",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user_id = decode_access_token(token)
+    user_id = decode_access_token(effective_token)
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -153,3 +155,52 @@ def verify_assessment_access(
     # Verify access to the parent factory
     verify_factory_access(db, user, assessment.industry_id, read_only=read_only)
     return assessment
+
+def resolve_accessible_assessment(
+    db: Session,
+    user: User,
+    assessment_id: Optional[int] = None,
+    read_only: bool = True
+) -> Optional[Assessment]:
+    """
+    Attempts to verify access to requested assessment_id.
+    If requested ID is missing, invalid, or belongs to another user,
+    seamlessly resolves the latest assessment accessible to the current user.
+    Returns None if the user has no assessments.
+    """
+    if assessment_id and assessment_id > 0:
+        try:
+            return verify_assessment_access(db, user, assessment_id, read_only=read_only)
+        except HTTPException:
+            pass
+
+    user_role = (user.role or "").lower()
+    if user_role == UserRole.ADMIN.value:
+        return db.query(Assessment).order_by(Assessment.created_at.desc()).first()
+
+    if user_role == UserRole.SUSTAINABILITY_CONSULTANT.value:
+        assignments = db.query(FactoryAssignment).filter(
+            FactoryAssignment.user_id == user.id,
+            FactoryAssignment.role == "sustainability_consultant"
+        ).all()
+        factory_ids = [a.industry_id or a.factory_id for a in assignments if (a.industry_id or a.factory_id)]
+        return db.query(Assessment).filter(Assessment.industry_id.in_(factory_ids)).order_by(Assessment.created_at.desc()).first()
+
+    if user_role == UserRole.REGULATOR_AUDITOR.value:
+        authorizations = db.query(FactoryAssignment).filter(
+            FactoryAssignment.user_id == user.id,
+            FactoryAssignment.role == "regulator_auditor"
+        ).all()
+        if authorizations:
+            auth_ids = [a.industry_id or a.factory_id for a in authorizations if (a.industry_id or a.factory_id)]
+            return db.query(Assessment).filter(Assessment.industry_id.in_(auth_ids)).order_by(Assessment.created_at.desc()).first()
+        return db.query(Assessment).order_by(Assessment.created_at.desc()).first()
+
+    # FACTORY_OWNER
+    owned_industries = db.query(Industry).filter(Industry.user_id == user.id).all()
+    owned_ids = [i.id for i in owned_industries]
+    if user.industry_id and user.industry_id not in owned_ids:
+        owned_ids.append(user.industry_id)
+    return db.query(Assessment).filter(
+        Assessment.industry_id.in_(owned_ids) if owned_ids else Assessment.user_id == user.id
+    ).order_by(Assessment.created_at.desc()).first()

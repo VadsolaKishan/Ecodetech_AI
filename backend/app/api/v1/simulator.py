@@ -4,7 +4,7 @@ from app.database.session import get_db
 from app.models.models import Assessment, Scenario, User
 from app.schemas.schemas import SimulatorInput, SimulatorResult, ScenarioCreate, ScenarioOut, ApiResponse
 from app.core.roles import UserRole, AuditEvent
-from app.api.deps import get_current_user, require_roles, verify_assessment_access
+from app.api.deps import get_current_user, require_roles, verify_assessment_access, resolve_accessible_assessment
 from app.services.simulator_service import SimulatorService
 from app.services.audit_service import log_audit_event
 from app.core.cache import api_cache
@@ -18,11 +18,24 @@ def simulate_impact(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    verify_assessment_access(db, current_user, assessment_id, read_only=True)
+    assessment = resolve_accessible_assessment(db, current_user, assessment_id)
+    if not assessment:
+        return ApiResponse(success=True, data={
+            "baseline_emissions_tco2e": 0,
+            "projected_emissions_tco2e": 0,
+            "total_reduction_tco2e": 0,
+            "reduction_percentage": 0,
+            "annual_cost_savings_inr": 0,
+            "estimated_investment_inr": 0,
+            "simple_payback_years": 0,
+            "new_circularity_score": 0,
+            "breakdown": []
+        })
+
     service = SimulatorService(db)
     try:
         result = service.simulate(
-            assessment_id=assessment_id,
+            assessment_id=assessment.id,
             solar_pct=sim_input.solar_percentage,
             recycled_pct=sim_input.recycled_material_percentage,
             waste_rec_pct=sim_input.waste_recovery_percentage,
@@ -38,17 +51,31 @@ def get_preset_scenarios(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    cache_key = f"scenarios_compare_{assessment_id}"
+    assessment = resolve_accessible_assessment(db, current_user, assessment_id)
+    if not assessment:
+        return ApiResponse(success=True, data=[])
+
+    actual_id = assessment.id
+    cache_key = f"scenarios_compare_{actual_id}"
     cached = api_cache.get(cache_key)
     if cached:
         return ApiResponse(success=True, data=cached)
 
-    verify_assessment_access(db, current_user, assessment_id, read_only=True)
     service = SimulatorService(db)
     try:
-        scenarios = service.generate_preset_scenarios(assessment_id)
-        api_cache.set(cache_key, scenarios, ttl=120, tags=[f"assessment_{assessment_id}"])
-        return ApiResponse(success=True, data=scenarios)
+        preset_scenarios = service.generate_preset_scenarios(actual_id)
+        for idx, ps in enumerate(preset_scenarios):
+            if "id" not in ps:
+                ps["id"] = -(idx + 1)
+
+        # Retrieve user-saved custom scenarios from the database
+        custom_scenarios = db.query(Scenario).filter(Scenario.assessment_id == actual_id).order_by(Scenario.id.desc()).all()
+        custom_list = [ScenarioOut.from_orm(s).dict() for s in custom_scenarios]
+
+        # Put custom saved scenarios first, followed by presets
+        all_scenarios = custom_list + preset_scenarios
+        api_cache.set(cache_key, all_scenarios, ttl=120, tags=[f"assessment_{actual_id}"])
+        return ApiResponse(success=True, data=all_scenarios)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -61,20 +88,23 @@ def save_scenario(
     current_user: User = Depends(require_roles(UserRole.FACTORY_OWNER, UserRole.SUSTAINABILITY_CONSULTANT, UserRole.ADMIN))
 ):
     # Enforce write access: Regulator is blocked
-    assessment = verify_assessment_access(db, current_user, assessment_id, read_only=False)
+    assessment = resolve_accessible_assessment(db, current_user, assessment_id, read_only=False)
+    if not assessment:
+        raise HTTPException(status_code=404, detail="No active assessment found to attach scenario")
 
+    actual_id = assessment.id
     service = SimulatorService(db)
     sim = service.simulate(
-        assessment_id=assessment_id,
+        assessment_id=actual_id,
         solar_pct=scen_in.solar_percentage,
         recycled_pct=scen_in.recycled_material_percentage,
         waste_rec_pct=scen_in.waste_recovery_percentage,
         transport_red_pct=scen_in.transport_reduction_percentage
     )
     scen = Scenario(
-        assessment_id=assessment_id,
+        assessment_id=actual_id,
         name=scen_in.name,
-        description=scen_in.description,
+        description=scen_in.description or f"{scen_in.solar_percentage}% Solar, {scen_in.recycled_material_percentage}% Recycled Feedstock",
         solar_percentage=scen_in.solar_percentage,
         recycled_material_percentage=scen_in.recycled_material_percentage,
         waste_recovery_percentage=scen_in.waste_recovery_percentage,
@@ -91,7 +121,7 @@ def save_scenario(
     db.commit()
     db.refresh(scen)
 
-    api_cache.invalidate_by_tag(f"assessment_{assessment_id}")
+    api_cache.invalidate_by_tag(f"assessment_{actual_id}")
 
     log_audit_event(
         db, action=AuditEvent.SCENARIO_CREATED, entity_type="SCENARIO",

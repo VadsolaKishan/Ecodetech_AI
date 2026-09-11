@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Leaf, Lock, Mail, User as UserIcon, ArrowRight, AlertCircle, Building2, UserCheck, Shield, CheckCircle2 } from "lucide-react";
+import { Lock, Mail, User as UserIcon, ArrowRight, AlertCircle, Building2, UserCheck, Shield, CheckCircle2 } from "lucide-react";
+import { EcoDetectLogo } from "../components/EcoDetectLogo";
 import { authApi } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { UserRole } from "../types/roles";
@@ -84,14 +85,10 @@ export const RegisterPage: React.FC = () => {
       <div className="w-full max-w-2xl bg-industrial-900/90 border border-industrial-700/80 rounded-2xl p-8 shadow-2xl backdrop-blur-xl space-y-6">
         {/* Brand */}
         <div className="flex flex-col items-center text-center">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-carbon-emerald via-carbon-green to-carbon-lime p-0.5 shadow-glow-green mb-3">
-            <div className="w-full h-full bg-industrial-950 rounded-[10px] flex items-center justify-center">
-              <Leaf className="w-6 h-6 text-carbon-green" />
-            </div>
-          </div>
-          <h2 className="text-2xl font-bold tracking-tight text-white font-mono">Create Industrial Account</h2>
+          <EcoDetectLogo size="lg" className="mb-3" />
+          <h2 className="text-2xl font-bold tracking-tight text-white font-mono">Create EcoDetect AI Account</h2>
           <p className="text-xs text-industrial-400 mt-1">
-            Register for CarbonCopilot AI with your designated governance role
+            Register for EcoDetect AI platform with your designated governance role
           </p>
         </div>
 

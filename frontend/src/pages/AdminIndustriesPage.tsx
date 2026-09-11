@@ -18,12 +18,21 @@ export const AdminIndustriesPage: React.FC = () => {
   const fetchData = async () => {
     if (factories.length === 0) setLoading(true);
     try {
-      const [facData, usersData] = await Promise.all([
-        adminApi.getIndustries(),
-        adminApi.getUsers().catch(() => [])
+      const [facData, consData, usersData] = await Promise.all([
+        adminApi.getIndustries(true),
+        adminApi.getConsultants(true).catch(() => []),
+        adminApi.getUsers(true).catch(() => [])
       ]);
       setFactories(facData || []);
-      const cons = (usersData || []).filter((u: any) => u.role === "SUSTAINABILITY_CONSULTANT");
+
+      let cons = consData && consData.length > 0 ? consData : [];
+      if (cons.length === 0 && usersData && usersData.length > 0) {
+        cons = usersData.filter(
+          (u: any) =>
+            (u.role || "").toLowerCase() === "sustainability_consultant" ||
+            (u.role || "").toLowerCase().includes("consultant")
+        );
+      }
       setConsultants(cons);
     } catch (err) {
       console.error("Failed to load industries directory", err);
@@ -165,14 +174,20 @@ export const AdminIndustriesPage: React.FC = () => {
                   required
                   value={selectedConsultantId}
                   onChange={(e) => setSelectedConsultantId(e.target.value ? Number(e.target.value) : "")}
-                  className="w-full bg-industrial-950 border border-industrial-700 rounded-xl px-3 py-2 text-slate-200"
+                  className="w-full bg-industrial-950 border border-industrial-700 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-carbon-green"
                 >
                   <option value="">-- Choose verified consultant --</option>
-                  {consultants.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.full_name} ({c.email})
+                  {consultants.length === 0 ? (
+                    <option disabled value="">
+                      No verified consultants registered yet
                     </option>
-                  ))}
+                  ) : (
+                    consultants.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.full_name} ({c.email})
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
