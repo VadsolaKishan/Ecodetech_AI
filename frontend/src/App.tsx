@@ -34,7 +34,7 @@ import { UnauthorizedPage } from "./pages/UnauthorizedPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
-import { dashboardApi } from "./services/api";
+import { dashboardApi, analysisApi, simulatorApi, actionPlanApi, reportApi } from "./services/api";
 
 const Layout: React.FC<{
   children: React.ReactNode;
@@ -280,12 +280,25 @@ function MainApp() {
   const [factoryName, setFactoryName] = useState<string>("Shree Gujarat Textile Works Pvt. Ltd.");
   const [industryType, setIndustryType] = useState<string>("Textile Manufacturing");
 
+  const prefetchCoreData = (assessmentId: number) => {
+    // Non-blocking background prefetch for instantaneous 0ms page navigation
+    Promise.allSettled([
+      analysisApi.getHotspots(assessmentId),
+      analysisApi.getRecommendations(assessmentId),
+      simulatorApi.getScenarios(assessmentId),
+      actionPlanApi.list(assessmentId),
+      reportApi.getReport(assessmentId),
+    ]).catch(() => {});
+  };
+
   const refreshTelemetry = async (assessmentIdToFetch?: number) => {
     try {
-      const summary = await dashboardApi.getSummary(assessmentIdToFetch || activeAssessmentId);
+      const target = assessmentIdToFetch || activeAssessmentId;
+      const summary = await dashboardApi.getSummary(target);
       if (summary.assessment_id) {
         setActiveAssessmentId(summary.assessment_id);
         localStorage.setItem("carbon_active_assessment", summary.assessment_id.toString());
+        prefetchCoreData(summary.assessment_id);
       }
       if (summary.factory_name) setFactoryName(summary.factory_name);
       if (summary.industry_type) setIndustryType(summary.industry_type);
@@ -297,6 +310,9 @@ function MainApp() {
   useEffect(() => {
     if (token) {
       refreshTelemetry();
+      if (activeAssessmentId) {
+        prefetchCoreData(activeAssessmentId);
+      }
     }
   }, [token, isAuthenticated]);
 

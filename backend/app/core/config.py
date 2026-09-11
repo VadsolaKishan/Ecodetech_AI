@@ -27,7 +27,9 @@ class Settings(BaseSettings):
         "*"
     ]
     
-    # Optional External Integrations (Fallback gracefully)
+    # AI / LLM Configuration (Google Gemini)
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", os.getenv("LLM_API_KEY", ""))
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
     WEATHER_API_KEY: str = os.getenv("WEATHER_API_KEY", "")
     MAPS_API_KEY: str = os.getenv("MAPS_API_KEY", "")

@@ -63,7 +63,7 @@ export const LandingPage: React.FC = () => {
       description: "Platform governance, user provisioning, emission factor library & audit trail.",
       tag: "Global Governance",
       badgeColor: "border-purple-400 text-purple-300 bg-purple-500/10",
-      targetPath: "/admin/users"
+      targetPath: "/dashboard"
     }
   ];
 

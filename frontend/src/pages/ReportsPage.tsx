@@ -18,23 +18,20 @@ interface ReportsPageProps {
 }
 
 export const ReportsPage: React.FC<ReportsPageProps> = ({ activeAssessmentId }) => {
-  const [assessmentId, setAssessmentId] = useState<number | null>(activeAssessmentId || null);
+  const [assessmentId, setAssessmentId] = useState<number | null>(() => {
+    return activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "1");
+  });
   const [report, setReport] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchReport = async () => {
     try {
-      setLoading(true);
-      let targetId = assessmentId;
-      if (!targetId) {
-        const sum = await dashboardApi.getSummary();
-        if (sum.assessment_id) {
-          targetId = sum.assessment_id;
-          setAssessmentId(sum.assessment_id);
-        }
+      if (!report) {
+        setLoading(true);
       }
-      if (targetId) {
-        const data = await reportApi.getReport(targetId);
+      const targetId = assessmentId || activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "1");
+      const data = await reportApi.getReport(targetId);
+      if (data) {
         setReport(data);
       }
     } catch (err) {
@@ -45,21 +42,24 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ activeAssessmentId }) 
   };
 
   useEffect(() => {
+    if (activeAssessmentId && activeAssessmentId !== assessmentId) {
+      setAssessmentId(activeAssessmentId);
+    }
     fetchReport();
   }, [assessmentId, activeAssessmentId]);
 
   const handleDownloadPdf = () => {
-    if (!assessmentId) return;
-    window.open(reportApi.getPdfDownloadUrl(assessmentId), "_blank");
+    const targetId = assessmentId || activeAssessmentId || 1;
+    window.open(reportApi.getPdfDownloadUrl(targetId), "_blank");
   };
 
   const handlePrint = () => {
     window.print();
   };
 
-  if (loading) {
+  if (loading && !report) {
     return (
-      <div className="flex-1 p-8 flex items-center justify-center">
+      <div className="flex-1 p-8 flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-3">
           <div className="w-8 h-8 border-2 border-carbon-green border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-xs font-mono text-industrial-400">Compiling executive audit report...</p>

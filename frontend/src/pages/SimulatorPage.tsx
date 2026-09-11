@@ -23,7 +23,9 @@ interface SimulatorPageProps {
 }
 
 export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId }) => {
-  const [assessmentId, setAssessmentId] = useState<number | null>(activeAssessmentId || null);
+  const [assessmentId, setAssessmentId] = useState<number | null>(() => {
+    return activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "1");
+  });
 
   // Sliders State
   const [solarPct, setSolarPct] = useState(30);
@@ -37,15 +39,11 @@ export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Load active assessment if not provided
+  // Update active assessment if prop changes
   useEffect(() => {
-    const initId = async () => {
-      if (!assessmentId) {
-        const sum = await dashboardApi.getSummary();
-        if (sum.assessment_id) setAssessmentId(sum.assessment_id);
-      }
-    };
-    initId();
+    if (activeAssessmentId) {
+      setAssessmentId(activeAssessmentId);
+    }
   }, [activeAssessmentId]);
 
   // Recalculate simulation on slider change

@@ -7,6 +7,7 @@ from app.core.roles import UserRole, AuditEvent
 from app.api.deps import get_current_user, require_roles, verify_assessment_access
 from app.services.report_generator import ReportService
 from app.services.audit_service import log_audit_event
+from app.core.cache import api_cache
 
 router = APIRouter()
 
@@ -16,11 +17,17 @@ def get_report_details(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    cache_key = f"report_data_{assessment_id}"
+    cached = api_cache.get(cache_key)
+    if cached:
+        return ApiResponse(success=True, data=cached)
+
     # Allowed for all authorized roles including Regulator inspection
     assessment = verify_assessment_access(db, current_user, assessment_id, read_only=True)
     service = ReportService(db)
     try:
         data = service.get_report_data(assessment_id)
+        api_cache.set(cache_key, data, ttl=120, tags=[f"assessment_{assessment_id}"])
         return ApiResponse(success=True, data=data)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

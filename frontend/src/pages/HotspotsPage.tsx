@@ -23,14 +23,12 @@ export const HotspotsPage: React.FC<HotspotsPageProps> = ({ activeAssessmentId }
 
   const fetchHotspots = async () => {
     try {
-      setLoading(true);
-      let targetId = activeAssessmentId;
-      if (!targetId) {
-        const sum = await dashboardApi.getSummary();
-        targetId = sum.assessment_id;
+      if (hotspots.length === 0) {
+        setLoading(true);
       }
-      if (targetId) {
-        const data = await analysisApi.getHotspots(targetId);
+      const targetId = activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "1");
+      const data = await analysisApi.getHotspots(targetId);
+      if (data) {
         setHotspots(data);
       }
     } catch (err) {
@@ -55,9 +53,9 @@ export const HotspotsPage: React.FC<HotspotsPageProps> = ({ activeAssessmentId }
     severity: h.severity,
   }));
 
-  if (loading) {
+  if (loading && hotspots.length === 0) {
     return (
-      <div className="flex-1 p-8 flex items-center justify-center">
+      <div className="flex-1 p-8 flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-3">
           <div className="w-8 h-8 border-2 border-carbon-critical border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-xs font-mono text-industrial-400">Pinpointing facility emission leaks...</p>

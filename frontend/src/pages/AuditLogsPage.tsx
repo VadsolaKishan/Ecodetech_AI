@@ -13,7 +13,7 @@ export const AuditLogsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const fetchLogs = async () => {
-    setLoading(true);
+    if (logs.length === 0) setLoading(true);
     try {
       const data = await adminApi.getAuditLogs(actionFilter || undefined);
       setLogs(data || []);
@@ -124,7 +124,7 @@ export const AuditLogsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-industrial-800/60 font-mono text-xs">
-              {loading ? (
+              {loading && logs.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-slate-500">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-carbon-green" />

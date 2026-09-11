@@ -16,7 +16,7 @@ export const AdminIndustriesPage: React.FC = () => {
   const [selectedConsultantId, setSelectedConsultantId] = useState<number | "">("");
 
   const fetchData = async () => {
-    setLoading(true);
+    if (factories.length === 0) setLoading(true);
     try {
       const [facData, usersData] = await Promise.all([
         adminApi.getIndustries(),
@@ -84,7 +84,7 @@ export const AdminIndustriesPage: React.FC = () => {
 
       {/* Facilities Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loading ? (
+        {loading && factories.length === 0 ? (
           <div className="col-span-3 py-12 text-center text-slate-500">
             <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-carbon-green" />
             Loading industrial facilities directory...

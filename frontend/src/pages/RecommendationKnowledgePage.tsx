@@ -12,7 +12,7 @@ export const RecommendationKnowledgePage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const fetchRules = async () => {
-    setLoading(true);
+    if (rules.length === 0) setLoading(true);
     try {
       const data = await adminApi.getRecommendationKnowledge();
       setRules(data || []);
@@ -88,7 +88,7 @@ export const RecommendationKnowledgePage: React.FC = () => {
 
       {/* Knowledge Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {loading ? (
+        {loading && rules.length === 0 ? (
           <div className="col-span-2 py-12 text-center text-slate-500">
             <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-carbon-green" />
             Loading circular engineering rules...

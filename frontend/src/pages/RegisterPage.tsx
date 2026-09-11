@@ -102,7 +102,7 @@ export const RegisterPage: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleRegister} className="space-y-6">
+        <form onSubmit={handleRegister} className="space-y-6" autoComplete="off">
           {/* Step 1: User Details */}
           <div className="space-y-4">
             <h3 className="text-xs font-mono uppercase tracking-wider text-slate-400 font-semibold border-b border-industrial-800 pb-2">
@@ -120,6 +120,7 @@ export const RegisterPage: React.FC = () => {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="e.g., Rajesh Patel"
+                    autoComplete="off"
                     className="w-full bg-industrial-950 border border-industrial-700 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-industrial-500 focus:outline-none focus:border-carbon-green"
                   />
                 </div>
@@ -135,6 +136,7 @@ export const RegisterPage: React.FC = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@enterprise.com"
+                    autoComplete="off"
                     className="w-full bg-industrial-950 border border-industrial-700 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-industrial-500 focus:outline-none focus:border-carbon-green"
                   />
                 </div>
@@ -152,6 +154,7 @@ export const RegisterPage: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="At least 6 characters"
+                  autoComplete="new-password"
                   className="w-full bg-industrial-950 border border-industrial-700 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-industrial-500 focus:outline-none focus:border-carbon-green"
                 />
               </div>

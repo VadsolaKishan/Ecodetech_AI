@@ -19,7 +19,7 @@ export const AdminUsersPage: React.FC = () => {
   });
 
   const fetchUsers = async () => {
-    setLoading(true);
+    if (users.length === 0) setLoading(true);
     try {
       const data = await adminApi.getUsers();
       setUsers(data || []);
@@ -120,7 +120,7 @@ export const AdminUsersPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-industrial-800/60 font-mono text-xs">
-              {loading ? (
+              {loading && users.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-12 text-center text-slate-500">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-carbon-green" />

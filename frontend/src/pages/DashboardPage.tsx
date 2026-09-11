@@ -43,7 +43,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ activeAssessmentId
 
   const fetchSummary = async () => {
     try {
-      setLoading(true);
+      if (!summary) {
+        setLoading(true);
+      }
       const data = await dashboardApi.getSummary(activeAssessmentId);
       setSummary(data);
     } catch (err) {
@@ -76,12 +78,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ activeAssessmentId
     }
   };
 
-  if (loading) {
+  if (loading && !summary) {
     return (
-      <div className="flex-1 p-8 flex items-center justify-center min-h-[500px]">
+      <div className="flex-1 p-8 flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-2 border-carbon-green border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs font-mono text-industrial-400">Loading plant carbon intelligence telemetry...</p>
+          <div className="w-8 h-8 border-2 border-carbon-green border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-xs font-mono text-industrial-400">Loading facility intelligence...</p>
         </div>
       </div>
     );

@@ -20,19 +20,10 @@ export const ScenarioComparisonPage: React.FC<ScenarioComparisonPageProps> = ({ 
 
   const fetchScenarios = async () => {
     try {
-      setLoading(true);
-      let targetId = activeAssessmentId;
-      if (!targetId) {
-        try {
-          const sum = await dashboardApi.getSummary();
-          targetId = sum.assessment_id;
-        } catch {
-          // summary fallback
-        }
+      if (scenarios.length === 0) {
+        setLoading(true);
       }
-      if (!targetId) {
-        targetId = 1;
-      }
+      const targetId = activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "1");
       const list = await simulatorApi.getScenarios(targetId);
       setScenarios(list || []);
     } catch (err) {
@@ -47,7 +38,7 @@ export const ScenarioComparisonPage: React.FC<ScenarioComparisonPageProps> = ({ 
     fetchScenarios();
   }, [activeAssessmentId]);
 
-  if (loading) {
+  if (loading && scenarios.length === 0) {
     return (
       <div className="flex-1 p-8 flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-3">

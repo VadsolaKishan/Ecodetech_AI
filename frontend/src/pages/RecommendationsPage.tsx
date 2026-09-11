@@ -32,14 +32,12 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ active
 
   const fetchRecs = async () => {
     try {
-      setLoading(true);
-      let targetId = activeAssessmentId;
-      if (!targetId) {
-        const sum = await dashboardApi.getSummary();
-        targetId = sum.assessment_id;
+      if (recommendations.length === 0) {
+        setLoading(true);
       }
-      if (targetId) {
-        const data = await analysisApi.getRecommendations(targetId);
+      const targetId = activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "1");
+      const data = await analysisApi.getRecommendations(targetId);
+      if (data) {
         setRecommendations(data);
       }
     } catch (err) {
@@ -76,9 +74,9 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ active
     ? recommendations
     : recommendations.filter((r) => r.category.toLowerCase() === selectedCategory.toLowerCase());
 
-  if (loading) {
+  if (loading && recommendations.length === 0) {
     return (
-      <div className="flex-1 p-8 flex items-center justify-center">
+      <div className="flex-1 p-8 flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-3">
           <div className="w-8 h-8 border-2 border-carbon-green border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-xs font-mono text-industrial-400">Scoring circular economy alternatives...</p>

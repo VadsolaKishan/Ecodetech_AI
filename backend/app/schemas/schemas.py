@@ -265,7 +265,10 @@ class ActionPlanOut(BaseModel):
 class ChatQuery(BaseModel):
     assessment_id: Optional[int] = None
     message: str
+    history: Optional[List[Dict[str, str]]] = None
 
 class ChatResponse(BaseModel):
     response: str
     context_used: Dict[str, Any] = {}
+    model_used: Optional[str] = None
+    is_llm_active: bool = False

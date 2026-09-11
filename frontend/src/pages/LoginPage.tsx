@@ -11,12 +11,8 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const redirectByRole = (userRole?: string) => {
-    if ((userRole || "").toLowerCase() === "admin") {
-      navigate("/admin");
-    } else {
-      navigate("/dashboard");
-    }
+  const redirectByRole = () => {
+    navigate("/dashboard");
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -24,9 +20,8 @@ export const LoginPage: React.FC = () => {
     setError("");
     setLoading(true);
     try {
-      const res = await login(email, password);
-      const userRole = res.data?.user?.role;
-      redirectByRole(userRole);
+      await login(email, password);
+      redirectByRole();
     } catch (err: any) {
       setError(err.response?.data?.detail || "Invalid email or password");
     } finally {
@@ -102,7 +97,7 @@ export const LoginPage: React.FC = () => {
         </div>
 
         {/* Standard Login Form */}
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
           <div>
             <label className="block text-xs font-medium text-industrial-300 mb-1">Work Email</label>
             <div className="relative">
@@ -113,6 +108,7 @@ export const LoginPage: React.FC = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="plant.manager@factory.com"
+                autoComplete="off"
                 className="w-full bg-industrial-950 border border-industrial-700 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-industrial-500 focus:outline-none focus:border-carbon-green"
               />
             </div>
@@ -128,6 +124,7 @@ export const LoginPage: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
+                autoComplete="new-password"
                 className="w-full bg-industrial-950 border border-industrial-700 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-industrial-500 focus:outline-none focus:border-carbon-green"
               />
             </div>

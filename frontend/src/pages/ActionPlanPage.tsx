@@ -21,10 +21,12 @@ interface ActionPlanPageProps {
 }
 
 export const ActionPlanPage: React.FC<ActionPlanPageProps> = ({ activeAssessmentId }) => {
-  const [assessmentId, setAssessmentId] = useState<number | null>(activeAssessmentId || null);
+  const [assessmentId, setAssessmentId] = useState<number | null>(() => {
+    return activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "1");
+  });
   const [actions, setActions] = useState<ActionPlanItem[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // New action form state
   const [newTitle, setNewTitle] = useState("");
@@ -37,16 +39,8 @@ export const ActionPlanPage: React.FC<ActionPlanPageProps> = ({ activeAssessment
 
   const fetchActions = async () => {
     try {
-      setLoading(true);
-      let targetId = assessmentId;
-      if (!targetId) {
-        const sum = await dashboardApi.getSummary();
-        if (sum.assessment_id) {
-          targetId = sum.assessment_id;
-          setAssessmentId(sum.assessment_id);
-        }
-      }
-      const data = await actionPlanApi.list(targetId || undefined);
+      const targetId = assessmentId || activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "1");
+      const data = await actionPlanApi.list(targetId);
       setActions(data);
     } catch (err) {
       console.error(err);
@@ -56,6 +50,9 @@ export const ActionPlanPage: React.FC<ActionPlanPageProps> = ({ activeAssessment
   };
 
   useEffect(() => {
+    if (activeAssessmentId && activeAssessmentId !== assessmentId) {
+      setAssessmentId(activeAssessmentId);
+    }
     fetchActions();
   }, [assessmentId, activeAssessmentId]);
 

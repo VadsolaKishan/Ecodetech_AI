@@ -22,7 +22,8 @@ def chat_with_copilot(
     service = AssistantService(db)
     result = service.answer_query(
         assessment_id=query.assessment_id,
-        message=query.message
+        message=query.message,
+        history=query.history
     )
     return ApiResponse(
         success=True,

@@ -7,6 +7,7 @@ from app.core.roles import UserRole, AuditEvent
 from app.api.deps import get_current_user, require_roles, verify_assessment_access
 from app.services.simulator_service import SimulatorService
 from app.services.audit_service import log_audit_event
+from app.core.cache import api_cache
 
 router = APIRouter()
 
@@ -37,10 +38,16 @@ def get_preset_scenarios(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    cache_key = f"scenarios_compare_{assessment_id}"
+    cached = api_cache.get(cache_key)
+    if cached:
+        return ApiResponse(success=True, data=cached)
+
     verify_assessment_access(db, current_user, assessment_id, read_only=True)
     service = SimulatorService(db)
     try:
         scenarios = service.generate_preset_scenarios(assessment_id)
+        api_cache.set(cache_key, scenarios, ttl=120, tags=[f"assessment_{assessment_id}"])
         return ApiResponse(success=True, data=scenarios)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -83,6 +90,8 @@ def save_scenario(
     db.add(scen)
     db.commit()
     db.refresh(scen)
+
+    api_cache.invalidate_by_tag(f"assessment_{assessment_id}")
 
     log_audit_event(
         db, action=AuditEvent.SCENARIO_CREATED, entity_type="SCENARIO",

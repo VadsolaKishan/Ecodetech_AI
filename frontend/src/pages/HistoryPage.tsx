@@ -15,7 +15,9 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ onSelectAssessment }) 
 
   const fetchHistory = async () => {
     try {
-      setLoading(true);
+      if (assessments.length === 0) {
+        setLoading(true);
+      }
       const data = await assessmentApi.list();
       setAssessments(data);
     } catch (err) {

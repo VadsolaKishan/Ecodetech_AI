@@ -10,6 +10,7 @@ from app.services.hotspot_detector import HotspotDetectionEngine
 from app.services.recommendation_engine import RecommendationEngine
 from app.services.circularity_score import CircularityScoringEngine
 from app.services.audit_service import log_audit_event
+from app.core.cache import api_cache
 
 router = APIRouter()
 
@@ -34,6 +35,9 @@ def run_carbon_analysis(
     circ_res = circ_engine.calculate_circularity_score(assessment_id)
 
     db.refresh(assessment)
+
+    # Invalidate cache for this assessment
+    api_cache.invalidate_by_tag(f"assessment_{assessment_id}")
 
     log_audit_event(
         db, action=AuditEvent.CALCULATION_RUN, entity_type="ASSESSMENT",
@@ -70,20 +74,24 @@ def get_emissions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    cache_key = f"emissions_{assessment_id}"
+    cached = api_cache.get(cache_key)
+    if cached:
+        return ApiResponse(success=True, data=cached)
+
     assessment = verify_assessment_access(db, current_user, assessment_id, read_only=True)
     results = db.query(EmissionResult).filter(EmissionResult.assessment_id == assessment_id).all()
 
-    return ApiResponse(
-        success=True,
-        data={
-            "assessment_id": assessment_id,
-            "total_emissions_tco2e": assessment.total_emissions_tco2e,
-            "scope1_tco2e": assessment.scope1_tco2e,
-            "scope2_tco2e": assessment.scope2_tco2e,
-            "scope3_tco2e": assessment.scope3_tco2e,
-            "results": [EmissionResultOut.from_orm(r).dict() for r in results]
-        }
-    )
+    data = {
+        "assessment_id": assessment_id,
+        "total_emissions_tco2e": assessment.total_emissions_tco2e,
+        "scope1_tco2e": assessment.scope1_tco2e,
+        "scope2_tco2e": assessment.scope2_tco2e,
+        "scope3_tco2e": assessment.scope3_tco2e,
+        "results": [EmissionResultOut.from_orm(r).dict() for r in results]
+    }
+    api_cache.set(cache_key, data, ttl=120, tags=[f"assessment_{assessment_id}"])
+    return ApiResponse(success=True, data=data)
 
 @router.get("/assessments/{assessment_id}/hotspots", response_model=ApiResponse)
 def get_hotspots(
@@ -91,12 +99,16 @@ def get_hotspots(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    cache_key = f"hotspots_{assessment_id}"
+    cached = api_cache.get(cache_key)
+    if cached:
+        return ApiResponse(success=True, data=cached)
+
     verify_assessment_access(db, current_user, assessment_id, read_only=True)
     hotspots = db.query(EmissionHotspot).filter(EmissionHotspot.assessment_id == assessment_id).order_by(EmissionHotspot.percentage_contribution.desc()).all()
-    return ApiResponse(
-        success=True,
-        data=[HotspotOut.from_orm(h).dict() for h in hotspots]
-    )
+    data = [HotspotOut.from_orm(h).dict() for h in hotspots]
+    api_cache.set(cache_key, data, ttl=120, tags=[f"assessment_{assessment_id}"])
+    return ApiResponse(success=True, data=data)
 
 @router.get("/assessments/{assessment_id}/recommendations", response_model=ApiResponse)
 def get_recommendations(
@@ -104,9 +116,13 @@ def get_recommendations(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    cache_key = f"recs_{assessment_id}"
+    cached = api_cache.get(cache_key)
+    if cached:
+        return ApiResponse(success=True, data=cached)
+
     verify_assessment_access(db, current_user, assessment_id, read_only=True)
     recs = db.query(Recommendation).filter(Recommendation.assessment_id == assessment_id).order_by(Recommendation.priority_rank.asc()).all()
-    return ApiResponse(
-        success=True,
-        data=[RecommendationOut.from_orm(r).dict() for r in recs]
-    )
+    data = [RecommendationOut.from_orm(r).dict() for r in recs]
+    api_cache.set(cache_key, data, ttl=120, tags=[f"assessment_{assessment_id}"])
+    return ApiResponse(success=True, data=data)

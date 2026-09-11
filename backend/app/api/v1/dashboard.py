@@ -9,6 +9,7 @@ from app.models.models import (
 from app.schemas.schemas import ApiResponse
 from app.core.roles import UserRole
 from app.api.deps import get_current_user, verify_assessment_access
+from app.core.cache import api_cache
 
 router = APIRouter()
 
@@ -18,6 +19,12 @@ def get_dashboard_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if assessment_id:
+        cache_key = f"dash_summary_{assessment_id}_{current_user.id}"
+        cached = api_cache.get(cache_key)
+        if cached:
+            return ApiResponse(success=True, data=cached)
+
     user_role = (current_user.role or "").lower()
     assessment = None
 
@@ -61,6 +68,11 @@ def get_dashboard_summary(
                 "kpis": {}
             }
         )
+
+    resolved_cache_key = f"dash_summary_{assessment.id}_{current_user.id}"
+    cached = api_cache.get(resolved_cache_key)
+    if cached:
+        return ApiResponse(success=True, data=cached)
 
     industry = assessment.industry
     hotspots = db.query(EmissionHotspot).filter(EmissionHotspot.assessment_id == assessment.id).order_by(EmissionHotspot.percentage_contribution.desc()).all()
@@ -158,5 +170,7 @@ def get_dashboard_summary(
         "hotspots_count": len(hotspots),
         "recommendations_count": len(recommendations)
     }
+
+    api_cache.set(resolved_cache_key, summary_data, ttl=120, tags=[f"assessment_{assessment.id}"])
 
     return ApiResponse(success=True, data=summary_data)
