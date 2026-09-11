@@ -6,22 +6,7 @@ class SimulatorService:
     def __init__(self, db: Session):
         self.db = db
 
-    def simulate(self, assessment_id: int, solar_pct: float, recycled_pct: float, waste_rec_pct: float, transport_red_pct: float) -> Dict[str, Any]:
-        assessment = self.db.query(Assessment).filter(Assessment.id == assessment_id).first()
-        if not assessment:
-            raise ValueError(f"Assessment {assessment_id} not found")
-
-        results = self.db.query(EmissionResult).filter(EmissionResult.assessment_id == assessment_id).all()
-        baseline_total_kg = sum(r.emissions_kg_co2e for r in results)
-        if baseline_total_kg <= 0:
-            baseline_total_kg = max(1000.0, assessment.total_emissions_tco2e * 1000.0)
-
-        # Categorize baseline emissions
-        energy_kg = sum(r.emissions_kg_co2e for r in results if r.category == "Energy")
-        materials_kg = sum(r.emissions_kg_co2e for r in results if r.category == "Materials")
-        waste_kg = sum(r.emissions_kg_co2e for r in results if r.category == "Waste")
-        transport_kg = sum(r.emissions_kg_co2e for r in results if r.category == "Transport")
-
+    def _compute_simulation(self, baseline_total_kg: float, energy_kg: float, materials_kg: float, waste_kg: float, transport_kg: float, baseline_circ: float, solar_pct: float, recycled_pct: float, waste_rec_pct: float, transport_red_pct: float) -> Dict[str, Any]:
         # 1. Solar impact: Displaces grid electricity emissions (~0.716 to ~0.041 kg/kWh, ~94% reduction on solar share)
         solar_avoided_kg = energy_kg * (solar_pct / 100.0) * 0.94
         solar_capex_inr = (solar_avoided_kg / 1000.0) * 22000.0 # ~₹22,000 / tCO2 avoided
@@ -55,7 +40,6 @@ class SimulatorService:
         payback_months = max(4.0, round((total_capex / max(total_annual_savings, 1000.0)) * 12.0, 1)) if total_capex > 0 else 0.0
 
         # Dynamic Circularity Score update
-        baseline_circ = assessment.circularity_score or 35.0
         circ_gain = (solar_pct * 0.22) + (recycled_pct * 0.28) + (waste_rec_pct * 0.28) + (transport_red_pct * 0.12)
         new_circ = min(100.0, round(baseline_circ + (circ_gain * 0.45), 1))
 
@@ -79,13 +63,43 @@ class SimulatorService:
             "summary_message": f"Simulating this circular pathway cuts emissions by {reduction_pct}% ({avoided_t} tCO2e/yr) with estimated annual operational savings of ₹{total_annual_savings:,.0f} and payback within {payback_months} months."
         }
 
+    def simulate(self, assessment_id: int, solar_pct: float, recycled_pct: float, waste_rec_pct: float, transport_red_pct: float) -> Dict[str, Any]:
+        assessment = self.db.query(Assessment).filter(Assessment.id == assessment_id).first()
+        if not assessment:
+            raise ValueError(f"Assessment {assessment_id} not found")
+
+        results = self.db.query(EmissionResult).filter(EmissionResult.assessment_id == assessment_id).all()
+        baseline_total_kg = sum(r.emissions_kg_co2e for r in results)
+        if baseline_total_kg <= 0:
+            baseline_total_kg = max(1000.0, assessment.total_emissions_tco2e * 1000.0)
+
+        energy_kg = sum(r.emissions_kg_co2e for r in results if r.category == "Energy")
+        materials_kg = sum(r.emissions_kg_co2e for r in results if r.category == "Materials")
+        waste_kg = sum(r.emissions_kg_co2e for r in results if r.category == "Waste")
+        transport_kg = sum(r.emissions_kg_co2e for r in results if r.category == "Transport")
+        baseline_circ = assessment.circularity_score or 35.0
+
+        return self._compute_simulation(
+            baseline_total_kg, energy_kg, materials_kg, waste_kg, transport_kg, baseline_circ,
+            solar_pct, recycled_pct, waste_rec_pct, transport_red_pct
+        )
+
     def generate_preset_scenarios(self, assessment_id: int) -> List[Dict[str, Any]]:
         assessment = self.db.query(Assessment).filter(Assessment.id == assessment_id).first()
         if not assessment:
             raise ValueError("Assessment not found")
 
-        baseline_t = assessment.total_emissions_tco2e
+        results = self.db.query(EmissionResult).filter(EmissionResult.assessment_id == assessment_id).all()
+        baseline_total_kg = sum(r.emissions_kg_co2e for r in results)
+        if baseline_total_kg <= 0:
+            baseline_total_kg = max(1000.0, assessment.total_emissions_tco2e * 1000.0)
+
+        energy_kg = sum(r.emissions_kg_co2e for r in results if r.category == "Energy")
+        materials_kg = sum(r.emissions_kg_co2e for r in results if r.category == "Materials")
+        waste_kg = sum(r.emissions_kg_co2e for r in results if r.category == "Waste")
+        transport_kg = sum(r.emissions_kg_co2e for r in results if r.category == "Transport")
         baseline_circ = assessment.circularity_score or 35.0
+        baseline_t = round(baseline_total_kg / 1000.0, 2)
 
         # Scenario A: Baseline
         scen_a = {
@@ -105,7 +119,10 @@ class SimulatorService:
         }
 
         # Scenario B: Solar Transition
-        sim_b = self.simulate(assessment_id, solar_pct=35.0, recycled_pct=0.0, waste_rec_pct=15.0, transport_red_pct=0.0)
+        sim_b = self._compute_simulation(
+            baseline_total_kg, energy_kg, materials_kg, waste_kg, transport_kg, baseline_circ,
+            solar_pct=35.0, recycled_pct=0.0, waste_rec_pct=15.0, transport_red_pct=0.0
+        )
         scen_b = {
             "name": "Solar & Clean Power",
             "description": "Install 35% on-site solar rooftop and basic waste segregation.",
@@ -123,7 +140,10 @@ class SimulatorService:
         }
 
         # Scenario C: Recycled Materials Focus
-        sim_c = self.simulate(assessment_id, solar_pct=10.0, recycled_pct=45.0, waste_rec_pct=40.0, transport_red_pct=15.0)
+        sim_c = self._compute_simulation(
+            baseline_total_kg, energy_kg, materials_kg, waste_kg, transport_kg, baseline_circ,
+            solar_pct=10.0, recycled_pct=45.0, waste_rec_pct=40.0, transport_red_pct=15.0
+        )
         scen_c = {
             "name": "Circular Feedstock & Zero Waste",
             "description": "Substitute 45% virgin raw materials with recycled content & 40% waste diversion.",
@@ -141,7 +161,10 @@ class SimulatorService:
         }
 
         # Scenario D: Maximum Circularity
-        sim_d = self.simulate(assessment_id, solar_pct=50.0, recycled_pct=55.0, waste_rec_pct=75.0, transport_red_pct=30.0)
+        sim_d = self._compute_simulation(
+            baseline_total_kg, energy_kg, materials_kg, waste_kg, transport_kg, baseline_circ,
+            solar_pct=50.0, recycled_pct=55.0, waste_rec_pct=75.0, transport_red_pct=30.0
+        )
         scen_d = {
             "name": "Maximum Circularity (Recommended)",
             "description": "Comprehensive transition: 50% solar, 55% recycled materials, 75% waste recovery, 30% logistics density.",

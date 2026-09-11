@@ -270,14 +270,15 @@ function AppRoutes({
   );
 }
 
-export function App() {
+function MainApp() {
+  const { isAuthenticated, token } = useAuth();
   const [activeAssessmentId, setActiveAssessmentId] = useState<number | undefined>(() => {
     const saved = localStorage.getItem("carbon_active_assessment");
-    return saved ? parseInt(saved) : undefined;
+    return saved ? parseInt(saved) : 1;
   });
 
-  const [factoryName, setFactoryName] = useState<string>("My Industrial Facility");
-  const [industryType, setIndustryType] = useState<string>("Manufacturing");
+  const [factoryName, setFactoryName] = useState<string>("Shree Gujarat Textile Works Pvt. Ltd.");
+  const [industryType, setIndustryType] = useState<string>("Textile Manufacturing");
 
   const refreshTelemetry = async (assessmentIdToFetch?: number) => {
     try {
@@ -294,8 +295,10 @@ export function App() {
   };
 
   useEffect(() => {
-    refreshTelemetry();
-  }, []);
+    if (token) {
+      refreshTelemetry();
+    }
+  }, [token, isAuthenticated]);
 
   const handleAssessmentSelected = (newAssessmentId: number) => {
     setActiveAssessmentId(newAssessmentId);
@@ -304,19 +307,25 @@ export function App() {
   };
 
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Layout
+    <BrowserRouter>
+      <Layout
+        activeAssessmentId={activeAssessmentId}
+        factoryName={factoryName}
+        industryType={industryType}
+      >
+        <AppRoutes
           activeAssessmentId={activeAssessmentId}
-          factoryName={factoryName}
-          industryType={industryType}
-        >
-          <AppRoutes
-            activeAssessmentId={activeAssessmentId}
-            handleAssessmentSelected={handleAssessmentSelected}
-          />
-        </Layout>
-      </BrowserRouter>
+          handleAssessmentSelected={handleAssessmentSelected}
+        />
+      </Layout>
+    </BrowserRouter>
+  );
+}
+
+export function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
     </AuthProvider>
   );
 }

@@ -29,7 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAssistant, factoryName, in
   const roleColors = ROLE_BADGE_COLORS[role] || ROLE_BADGE_COLORS.FACTORY_OWNER;
 
   return (
-    <header className="h-16 bg-industrial-900/90 border-b border-industrial-700/60 px-6 flex items-center justify-between sticky top-[37px] z-30 backdrop-blur-md">
+    <header className="h-16 bg-industrial-900/90 border-b border-industrial-700/60 px-6 flex items-center justify-between sticky top-0 z-30 backdrop-blur-md">
       {/* Brand Logo */}
       <div className="flex items-center space-x-3">
         <Link to="/dashboard" className="flex items-center space-x-2.5 group">
