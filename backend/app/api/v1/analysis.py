@@ -1,25 +1,27 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.models.models import Assessment, EmissionResult, EmissionHotspot, Recommendation, User
 from app.schemas.schemas import ApiResponse, EmissionResultOut, HotspotOut, RecommendationOut
-from app.api.deps import get_current_user
+from app.core.roles import UserRole, AuditEvent
+from app.api.deps import get_current_user, require_roles, verify_assessment_access
 from app.services.carbon_calculator import CarbonCalculationEngine
 from app.services.hotspot_detector import HotspotDetectionEngine
 from app.services.recommendation_engine import RecommendationEngine
 from app.services.circularity_score import CircularityScoringEngine
+from app.services.audit_service import log_audit_event
 
 router = APIRouter()
 
 @router.post("/assessments/{assessment_id}/calculate", response_model=ApiResponse)
 def run_carbon_analysis(
     assessment_id: int,
+    request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_roles(UserRole.FACTORY_OWNER, UserRole.SUSTAINABILITY_CONSULTANT, UserRole.ADMIN))
 ):
-    assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
-    if not assessment:
-        raise HTTPException(status_code=404, detail="Assessment not found")
+    # Enforce write access (Regulator cannot trigger write calculations)
+    assessment = verify_assessment_access(db, current_user, assessment_id, read_only=False)
 
     calc_engine = CarbonCalculationEngine(db)
     hotspot_engine = HotspotDetectionEngine(db)
@@ -32,6 +34,19 @@ def run_carbon_analysis(
     circ_res = circ_engine.calculate_circularity_score(assessment_id)
 
     db.refresh(assessment)
+
+    log_audit_event(
+        db, action=AuditEvent.CALCULATION_RUN, entity_type="ASSESSMENT",
+        user=current_user, entity_id=assessment_id, factory_id=assessment.industry_id,
+        details={"total_emissions_tco2e": assessment.total_emissions_tco2e, "hotspots": len(hotspots)},
+        request=request
+    )
+    log_audit_event(
+        db, action=AuditEvent.RECOMMENDATION_GENERATED, entity_type="RECOMMENDATIONS",
+        user=current_user, entity_id=assessment_id, factory_id=assessment.industry_id,
+        details={"recommendation_count": len(recs)},
+        request=request
+    )
 
     return ApiResponse(
         success=True,
@@ -55,28 +70,20 @@ def get_emissions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    assessment = verify_assessment_access(db, current_user, assessment_id, read_only=True)
     results = db.query(EmissionResult).filter(EmissionResult.assessment_id == assessment_id).all()
-    assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
-    if not assessment:
-        raise HTTPException(status_code=404, detail="Assessment not found")
 
-    data = {
-        "assessment_id": assessment_id,
-        "total_emissions_tco2e": assessment.total_emissions_tco2e,
-        "scopes": {
+    return ApiResponse(
+        success=True,
+        data={
+            "assessment_id": assessment_id,
+            "total_emissions_tco2e": assessment.total_emissions_tco2e,
             "scope1_tco2e": assessment.scope1_tco2e,
             "scope2_tco2e": assessment.scope2_tco2e,
-            "scope3_tco2e": assessment.scope3_tco2e
-        },
-        "by_category": {
-            "Energy": round(sum(r.emissions_kg_co2e for r in results if r.category == "Energy") / 1000.0, 2),
-            "Materials": round(sum(r.emissions_kg_co2e for r in results if r.category == "Materials") / 1000.0, 2),
-            "Waste": round(sum(r.emissions_kg_co2e for r in results if r.category == "Waste") / 1000.0, 2),
-            "Transport": round(sum(r.emissions_kg_co2e for r in results if r.category == "Transport") / 1000.0, 2)
-        },
-        "detailed_results": [EmissionResultOut.from_orm(r).dict() for r in results]
-    }
-    return ApiResponse(success=True, data=data)
+            "scope3_tco2e": assessment.scope3_tco2e,
+            "results": [EmissionResultOut.from_orm(r).dict() for r in results]
+        }
+    )
 
 @router.get("/assessments/{assessment_id}/hotspots", response_model=ApiResponse)
 def get_hotspots(
@@ -84,6 +91,7 @@ def get_hotspots(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    verify_assessment_access(db, current_user, assessment_id, read_only=True)
     hotspots = db.query(EmissionHotspot).filter(EmissionHotspot.assessment_id == assessment_id).order_by(EmissionHotspot.percentage_contribution.desc()).all()
     return ApiResponse(
         success=True,
@@ -96,6 +104,7 @@ def get_recommendations(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    verify_assessment_access(db, current_user, assessment_id, read_only=True)
     recs = db.query(Recommendation).filter(Recommendation.assessment_id == assessment_id).order_by(Recommendation.priority_rank.asc()).all()
     return ApiResponse(
         success=True,

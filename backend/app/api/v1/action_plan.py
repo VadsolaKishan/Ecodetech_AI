@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.database.session import get_db
 from app.models.models import ActionPlan, Assessment, User
 from app.schemas.schemas import ActionPlanCreate, ActionPlanUpdate, ActionPlanOut, ApiResponse
-from app.api.deps import get_current_user
+from app.core.roles import UserRole, AuditEvent
+from app.api.deps import get_current_user, require_roles, verify_assessment_access
+from app.services.audit_service import log_audit_event
 
 router = APIRouter()
 
@@ -14,9 +16,17 @@ def get_action_plans(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    query = db.query(ActionPlan).filter(ActionPlan.user_id == current_user.id)
     if assessment_id:
-        query = query.filter(ActionPlan.assessment_id == assessment_id)
+        verify_assessment_access(db, current_user, assessment_id, read_only=True)
+        query = db.query(ActionPlan).filter(ActionPlan.assessment_id == assessment_id)
+    else:
+        # Fallback to all action plans accessible to user
+        user_role = (current_user.role or "").lower()
+        if user_role == UserRole.ADMIN:
+            query = db.query(ActionPlan)
+        else:
+            query = db.query(ActionPlan).filter(ActionPlan.user_id == current_user.id)
+
     items = query.order_by(ActionPlan.created_at.desc()).all()
     return ApiResponse(
         success=True,
@@ -26,13 +36,13 @@ def get_action_plans(
 @router.post("", response_model=ApiResponse)
 def create_action_plan(
     action_in: ActionPlanCreate,
+    request: Request,
     assessment_id: int = Query(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_roles(UserRole.FACTORY_OWNER, UserRole.SUSTAINABILITY_CONSULTANT, UserRole.ADMIN))
 ):
-    assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
-    if not assessment:
-        raise HTTPException(status_code=404, detail="Assessment not found")
+    # Enforce write access (blocks Regulator)
+    assessment = verify_assessment_access(db, current_user, assessment_id, read_only=False)
 
     item = ActionPlan(
         user_id=current_user.id,
@@ -50,6 +60,14 @@ def create_action_plan(
     db.add(item)
     db.commit()
     db.refresh(item)
+
+    log_audit_event(
+        db, action=AuditEvent.ACTION_PLAN_CHANGED, entity_type="ACTION_PLAN",
+        user=current_user, entity_id=item.id, factory_id=assessment.industry_id,
+        details={"title": item.title, "action": "CREATE", "status": item.status},
+        request=request
+    )
+
     return ApiResponse(
         success=True,
         message="Action item added to plan",
@@ -60,18 +78,36 @@ def create_action_plan(
 def update_action_plan(
     action_id: int,
     action_in: ActionPlanUpdate,
+    request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_roles(UserRole.FACTORY_OWNER, UserRole.SUSTAINABILITY_CONSULTANT, UserRole.ADMIN))
 ):
-    item = db.query(ActionPlan).filter(ActionPlan.id == action_id, ActionPlan.user_id == current_user.id).first()
+    item = db.query(ActionPlan).filter(ActionPlan.id == action_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Action item not found")
 
-    for key, val in action_in.dict(exclude_unset=True).items():
-        setattr(item, key, val)
+    # Enforce access to parent assessment
+    verify_assessment_access(db, current_user, item.assessment_id, read_only=False)
+
+    if action_in.status:
+        item.status = action_in.status
+    if action_in.owner:
+        item.owner = action_in.owner
+    if action_in.deadline:
+        item.deadline = action_in.deadline
+    if action_in.priority:
+        item.priority = action_in.priority
 
     db.commit()
     db.refresh(item)
+
+    log_audit_event(
+        db, action=AuditEvent.ACTION_PLAN_CHANGED, entity_type="ACTION_PLAN",
+        user=current_user, entity_id=item.id,
+        details={"title": item.title, "action": "UPDATE", "new_status": item.status},
+        request=request
+    )
+
     return ApiResponse(
         success=True,
         message="Action item updated",
@@ -81,13 +117,24 @@ def update_action_plan(
 @router.delete("/{action_id}", response_model=ApiResponse)
 def delete_action_plan(
     action_id: int,
+    request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_roles(UserRole.FACTORY_OWNER, UserRole.SUSTAINABILITY_CONSULTANT, UserRole.ADMIN))
 ):
-    item = db.query(ActionPlan).filter(ActionPlan.id == action_id, ActionPlan.user_id == current_user.id).first()
+    item = db.query(ActionPlan).filter(ActionPlan.id == action_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Action item not found")
 
+    verify_assessment_access(db, current_user, item.assessment_id, read_only=False)
+
     db.delete(item)
     db.commit()
-    return ApiResponse(success=True, message="Action item deleted")
+
+    log_audit_event(
+        db, action=AuditEvent.ACTION_PLAN_CHANGED, entity_type="ACTION_PLAN",
+        user=current_user, entity_id=action_id,
+        details={"title": item.title, "action": "DELETE"},
+        request=request
+    )
+
+    return ApiResponse(success=True, message="Action item removed from plan")

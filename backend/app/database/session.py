@@ -20,7 +20,14 @@ else:
 
     # Neon PgBouncer pooler works best with NullPool or aggressive recycle
     engine_kwargs["poolclass"] = NullPool
-    engine_kwargs["connect_args"] = {"connect_timeout": 15, "sslmode": "require"}
+    engine_kwargs["connect_args"] = {
+        "connect_timeout": 20,
+        "sslmode": "require",
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5
+    }
 
 engine = create_engine(
     db_url,

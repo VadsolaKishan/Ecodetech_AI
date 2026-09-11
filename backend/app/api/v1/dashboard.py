@@ -2,9 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.database.session import get_db
-from app.models.models import Assessment, Industry, EmissionResult, EmissionHotspot, Recommendation, User
+from app.models.models import (
+    Assessment, Industry, EmissionResult, EmissionHotspot, Recommendation, User,
+    FactoryAssignment
+)
 from app.schemas.schemas import ApiResponse
-from app.api.deps import get_current_user
+from app.core.roles import UserRole
+from app.api.deps import get_current_user, verify_assessment_access
 
 router = APIRouter()
 
@@ -14,22 +18,46 @@ def get_dashboard_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    user_role = (current_user.role or "").lower()
+    assessment = None
+
     if assessment_id:
-        assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
+        assessment = verify_assessment_access(db, current_user, assessment_id, read_only=True)
     else:
-        assessment = db.query(Assessment).filter(
-            Assessment.user_id == current_user.id,
-            Assessment.status == "calculated"
-        ).order_by(Assessment.total_emissions_tco2e.desc()).first()
-        if not assessment:
-            assessment = db.query(Assessment).filter(Assessment.user_id == current_user.id).order_by(Assessment.created_at.desc()).first()
+        # Resolve appropriate default assessment based on role
+        if user_role == UserRole.ADMIN:
+            assessment = db.query(Assessment).order_by(Assessment.created_at.desc()).first()
+        elif user_role == UserRole.SUSTAINABILITY_CONSULTANT:
+            assignments = db.query(FactoryAssignment).filter(
+                FactoryAssignment.user_id == current_user.id,
+                FactoryAssignment.role == "sustainability_consultant"
+            ).all()
+            factory_ids = [a.industry_id or a.factory_id for a in assignments if (a.industry_id or a.factory_id)]
+            assessment = db.query(Assessment).filter(Assessment.industry_id.in_(factory_ids)).order_by(Assessment.created_at.desc()).first()
+        elif user_role == UserRole.REGULATOR_AUDITOR:
+            authorizations = db.query(FactoryAssignment).filter(
+                FactoryAssignment.user_id == current_user.id,
+                FactoryAssignment.role == "regulator_auditor"
+            ).all()
+            if authorizations:
+                auth_ids = [a.industry_id or a.factory_id for a in authorizations if (a.industry_id or a.factory_id)]
+                assessment = db.query(Assessment).filter(Assessment.industry_id.in_(auth_ids)).order_by(Assessment.created_at.desc()).first()
+            else:
+                assessment = db.query(Assessment).order_by(Assessment.created_at.desc()).first()
+        else:
+            # FACTORY_OWNER
+            owned_industries = db.query(Industry).filter(Industry.user_id == current_user.id).all()
+            owned_ids = [i.id for i in owned_industries]
+            if current_user.industry_id and current_user.industry_id not in owned_ids:
+                owned_ids.append(current_user.industry_id)
+            assessment = db.query(Assessment).filter(Assessment.industry_id.in_(owned_ids) if owned_ids else Assessment.user_id == current_user.id).order_by(Assessment.created_at.desc()).first()
 
     if not assessment:
         return ApiResponse(
             success=True,
             data={
                 "has_assessment": False,
-                "headline": "Welcome to CarbonCopilot AI. Start an assessment or load a demo factory to begin.",
+                "headline": "Welcome to CarbonCopilot AI. Create your factory profile and start an assessment to begin.",
                 "kpis": {}
             }
         )
@@ -58,58 +86,19 @@ def get_dashboard_summary(
         "kpis": {
             "total_emissions_tco2e": assessment.total_emissions_tco2e,
             "potential_reduction_pct": red_pct,
-            "potential_reduction_tco2e": red_t,
-            "carbon_intensity": assessment.emission_intensity,
-            "production_unit": industry.production_unit if industry else "unit",
-            "top_hotspot": top_hotspot.source_name if top_hotspot else "Pending Analysis",
+            "top_hotspot": top_hotspot.source_name if top_hotspot else "Pending Calculation",
             "top_hotspot_pct": top_hotspot.percentage_contribution if top_hotspot else 0.0,
-            "top_hotspot_severity": top_hotspot.severity if top_hotspot else "Low",
-            "best_opportunity": top_opportunity.title if top_opportunity else "Pending Analysis",
-            "potential_annual_savings_inr": assessment.potential_savings_inr,
+            "top_opportunity": top_opportunity.title if top_opportunity else "Pending Optimization",
             "circularity_score": assessment.circularity_score,
-            "confidence_level": assessment.confidence_level
+            "annual_savings_inr": assessment.potential_savings_inr
         },
-        "scopes": {
-            "scope1_tco2e": assessment.scope1_tco2e,
-            "scope2_tco2e": assessment.scope2_tco2e,
-            "scope3_tco2e": assessment.scope3_tco2e
+        "scope_breakdown": {
+            "scope1": assessment.scope1_tco2e,
+            "scope2": assessment.scope2_tco2e,
+            "scope3": assessment.scope3_tco2e,
         },
-        "category_breakdown": {
-            "Energy": round(sum(r.emissions_kg_co2e for r in results if r.category == "Energy") / 1000.0, 2),
-            "Materials": round(sum(r.emissions_kg_co2e for r in results if r.category == "Materials") / 1000.0, 2),
-            "Waste": round(sum(r.emissions_kg_co2e for r in results if r.category == "Waste") / 1000.0, 2),
-            "Transport": round(sum(r.emissions_kg_co2e for r in results if r.category == "Transport") / 1000.0, 2)
-        },
-        "top_hotspots": [
-            {
-                "id": h.id,
-                "source_name": h.source_name,
-                "category": h.category,
-                "emissions_kg": h.emissions_kg_co2e,
-                "percentage": h.percentage_contribution,
-                "severity": h.severity,
-                "hotspot_score": h.hotspot_score,
-                "anomaly": h.anomaly_detected,
-                "explanation": h.explanation
-            }
-            for h in hotspots[:4]
-        ],
-        "top_recommendations": [
-            {
-                "id": r.id,
-                "title": r.title,
-                "category": r.category,
-                "target_source": r.target_emission_source,
-                "reduction_pct": r.reduction_percentage,
-                "co2_cut_kg": r.estimated_co2_reduction_kg,
-                "cost_inr": r.implementation_cost_inr,
-                "savings_inr": r.annual_savings_inr,
-                "payback_months": r.payback_months,
-                "feasibility": r.feasibility,
-                "priority_rank": r.priority_rank,
-                "reason": r.reason
-            }
-            for r in recommendations[:4]
-        ]
+        "hotspots_count": len(hotspots),
+        "recommendations_count": len(recommendations)
     }
+
     return ApiResponse(success=True, data=summary_data)

@@ -161,6 +161,19 @@ export const ActionPlanPage: React.FC<ActionPlanPageProps> = ({ activeAssessment
         </div>
       </div>
 
+      {/* Empty State Notice */}
+      {actions.length === 0 && (
+        <div className="p-8 text-center rounded-2xl bg-industrial-900/60 border border-industrial-800 space-y-3">
+          <div className="w-12 h-12 rounded-xl bg-industrial-950 border border-industrial-800 text-carbon-green flex items-center justify-center mx-auto">
+            <CheckSquare className="w-6 h-6 text-industrial-400" />
+          </div>
+          <h3 className="text-base font-bold text-white">No actions added yet</h3>
+          <p className="text-xs text-industrial-400 max-w-sm mx-auto">
+            Convert high-ROI circular recommendations into trackable milestones or click 'Add Custom Action' to schedule decarbonization tasks.
+          </p>
+        </div>
+      )}
+
       {/* Kanban Style Columns */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {columns.map((col) => {

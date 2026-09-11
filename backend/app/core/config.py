@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
     WEATHER_API_KEY: str = os.getenv("WEATHER_API_KEY", "")
     MAPS_API_KEY: str = os.getenv("MAPS_API_KEY", "")
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
 
     class Config:
         case_sensitive = True

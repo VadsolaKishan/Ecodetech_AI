@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.models.models import Assessment, Scenario, User
 from app.schemas.schemas import SimulatorInput, SimulatorResult, ScenarioCreate, ScenarioOut, ApiResponse
-from app.api.deps import get_current_user
+from app.core.roles import UserRole, AuditEvent
+from app.api.deps import get_current_user, require_roles, verify_assessment_access
 from app.services.simulator_service import SimulatorService
+from app.services.audit_service import log_audit_event
 
 router = APIRouter()
 
@@ -15,6 +17,7 @@ def simulate_impact(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    verify_assessment_access(db, current_user, assessment_id, read_only=True)
     service = SimulatorService(db)
     try:
         result = service.simulate(
@@ -34,6 +37,7 @@ def get_preset_scenarios(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    verify_assessment_access(db, current_user, assessment_id, read_only=True)
     service = SimulatorService(db)
     try:
         scenarios = service.generate_preset_scenarios(assessment_id)
@@ -44,10 +48,14 @@ def get_preset_scenarios(
 @router.post("/scenario", response_model=ApiResponse)
 def save_scenario(
     scen_in: ScenarioCreate,
+    request: Request,
     assessment_id: int = Query(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_roles(UserRole.FACTORY_OWNER, UserRole.SUSTAINABILITY_CONSULTANT, UserRole.ADMIN))
 ):
+    # Enforce write access: Regulator is blocked
+    assessment = verify_assessment_access(db, current_user, assessment_id, read_only=False)
+
     service = SimulatorService(db)
     sim = service.simulate(
         assessment_id=assessment_id,
@@ -64,15 +72,27 @@ def save_scenario(
         recycled_material_percentage=scen_in.recycled_material_percentage,
         waste_recovery_percentage=scen_in.waste_recovery_percentage,
         transport_reduction_percentage=scen_in.transport_reduction_percentage,
-        result_co2e_tonnes=sim["simulated_co2e_t"],
+        result_co2e_tonnes=sim["projected_emissions_tco2e"],
         reduction_percentage=sim["reduction_percentage"],
-        cost_estimate_inr=sim["estimated_capex_inr"],
-        annual_savings_inr=sim["estimated_annual_savings_inr"],
+        cost_estimate_inr=sim["capex_estimate_inr"],
+        annual_savings_inr=sim["annual_savings_inr"],
         payback_months=sim["payback_months"],
-        circularity_score=sim["new_circularity_score"],
-        is_recommended=False
+        circularity_score=sim["projected_circularity_score"],
+        is_recommended=sim["reduction_percentage"] > 25.0
     )
     db.add(scen)
     db.commit()
     db.refresh(scen)
-    return ApiResponse(success=True, message="Scenario saved successfully", data=ScenarioOut.from_orm(scen).dict())
+
+    log_audit_event(
+        db, action=AuditEvent.SCENARIO_CREATED, entity_type="SCENARIO",
+        user=current_user, entity_id=scen.id, factory_id=assessment.industry_id,
+        details={"name": scen.name, "co2_cut_pct": scen.reduction_percentage},
+        request=request
+    )
+
+    return ApiResponse(
+        success=True,
+        message="Scenario successfully saved to comparison roadmap",
+        data=ScenarioOut.from_orm(scen).dict()
+    )

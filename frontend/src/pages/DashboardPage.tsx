@@ -93,16 +93,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ activeAssessmentId
         <div className="w-16 h-16 rounded-2xl bg-carbon-green/10 border border-carbon-green/30 text-carbon-green flex items-center justify-center mx-auto shadow-glow-green">
           <Sparkles className="w-8 h-8" />
         </div>
-        <h2 className="text-2xl font-bold text-white">No Active Carbon Assessment Found</h2>
+        <h2 className="text-2xl font-bold text-white">No factory profile found.</h2>
         <p className="text-sm text-industrial-400 max-w-md mx-auto">
-          Begin by running a 5-minute carbon assessment for your facility, or launch an instant realistic demo factory to explore all features.
+          Create your factory profile to begin.
         </p>
         <div className="flex justify-center gap-4 pt-2">
           <Link
-            to="/assessment/new"
+            to="/profile"
             className="px-6 py-2.5 rounded-xl bg-carbon-green text-industrial-950 font-bold text-xs hover:bg-carbon-lime transition-all shadow-glow-green flex items-center space-x-2"
           >
-            <span>Create New Assessment</span>
+            <span>Create Factory Profile</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>

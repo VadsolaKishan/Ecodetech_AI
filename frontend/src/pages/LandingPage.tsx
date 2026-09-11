@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { 
   ArrowRight, 
   Flame, 
@@ -10,23 +10,11 @@ import {
   Layers, 
   Sparkles, 
   Building2,
-  ChevronRight
+  ChevronRight,
+  UserPlus
 } from "lucide-react";
-import { demoApi } from "../services/api";
 
 export const LandingPage: React.FC = () => {
-  const navigate = useNavigate();
-
-  const handleLaunchDemo = async (factoryId: number = 1) => {
-    try {
-      await demoApi.loadFactory(factoryId);
-      navigate("/dashboard");
-    } catch (err) {
-      console.error(err);
-      navigate("/dashboard");
-    }
-  };
-
   return (
     <div className="min-h-screen bg-industrial-950 bg-industrial-grid text-white flex flex-col selection:bg-carbon-green selection:text-industrial-950">
       {/* Top Navbar */}
@@ -47,13 +35,13 @@ export const LandingPage: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-4">
-          <button
-            onClick={() => handleLaunchDemo(1)}
+          <Link
+            to="/register"
             className="hidden sm:inline-flex items-center space-x-1.5 text-xs font-mono px-3 py-1.5 rounded-lg bg-industrial-850 border border-industrial-700 text-carbon-green hover:border-carbon-green transition-all"
           >
-            <span>Instant Demo (Surat Textiles)</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Create Account</span>
+          </Link>
           <Link
             to="/login"
             className="text-xs px-4 py-2 rounded-lg bg-carbon-green text-industrial-950 font-semibold hover:bg-carbon-lime transition-all shadow-glow-green"
@@ -92,13 +80,13 @@ export const LandingPage: React.FC = () => {
             <ArrowRight className="w-4 h-4" />
           </Link>
 
-          <button
-            onClick={() => handleLaunchDemo(1)}
+          <Link
+            to="/register"
             className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-industrial-900 border border-industrial-700 text-white font-semibold hover:bg-industrial-850 hover:border-carbon-green transition-all flex items-center justify-center space-x-2 text-sm"
           >
-            <span>Explore 60-Sec Demo Factory</span>
+            <span>Register Facility / Join</span>
             <Sparkles className="w-4 h-4 text-carbon-green" />
-          </button>
+          </Link>
         </div>
 
         {/* Dynamic Transition Graphic: CURRENT -> AI -> CIRCULAR */}

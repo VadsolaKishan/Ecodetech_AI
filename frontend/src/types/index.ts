@@ -3,6 +3,8 @@ export interface User {
   email: string;
   full_name: string;
   role: string;
+  industry_id?: number;
+  is_active?: boolean;
 }
 
 export interface Industry {
@@ -195,10 +197,61 @@ export interface DashboardSummary {
   }>;
 }
 
-export interface DemoFactory {
+
+export interface AuditLogItem {
   id: number;
-  name: string;
-  industry: string;
-  location: string;
-  description: string;
+  user_id?: number;
+  user_email?: string;
+  role?: string;
+  action: string;
+  entity_type: string;
+  entity_id?: number;
+  factory_id?: number;
+  ip_address?: string;
+  details?: string;
+  timestamp: string;
 }
+
+export interface AdminUserItem {
+  id: number;
+  email: string;
+  full_name: string;
+  role: string;
+  is_active: boolean;
+  industry_id?: number;
+  created_at?: string;
+}
+
+export interface EmissionFactorItem {
+  id: number;
+  category: string;
+  activity: string;
+  unit: string;
+  factor: number;
+  factor_unit: string;
+  source: string;
+  region: string;
+  year: number;
+  confidence_level: string;
+  version: string;
+  is_active: boolean;
+}
+
+export interface RecommendationKnowledgeItem {
+  id: number;
+  key: string;
+  title: string;
+  category: string;
+  target_source: string;
+  reduction_min_pct: number;
+  reduction_max_pct: number;
+  cost_multiplier_inr_per_kw: number;
+  savings_rate_per_kwh: number;
+  feasibility: string;
+  base_payback_months: number;
+  circularity_boost: number;
+  reason_template: string;
+  version: string;
+  is_active: boolean;
+}
+

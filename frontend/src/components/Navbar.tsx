@@ -3,13 +3,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { 
   Leaf, 
   Bot, 
-  User as UserIcon, 
   LogOut, 
-  Layers, 
-  ShieldCheck,
-  Building2
+  Building2,
+  Shield,
+  ChevronDown
 } from "lucide-react";
-import { authApi } from "../services/api";
+import { useAuth } from "../context/AuthContext";
+import { ROLE_LABELS, ROLE_BADGE_COLORS, UserRole } from "../types/roles";
 
 interface NavbarProps {
   onOpenAssistant: () => void;
@@ -19,13 +19,14 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ onOpenAssistant, factoryName, industryType }) => {
   const navigate = useNavigate();
-  const userStr = localStorage.getItem("carbon_user");
-  const user = userStr ? JSON.parse(userStr) : null;
+  const { user, role, isReadOnly, logout } = useAuth();
 
   const handleLogout = () => {
-    authApi.logout();
+    logout();
     navigate("/login");
   };
+
+  const roleColors = ROLE_BADGE_COLORS[role] || ROLE_BADGE_COLORS.FACTORY_OWNER;
 
   return (
     <header className="h-16 bg-industrial-900/90 border-b border-industrial-700/60 px-6 flex items-center justify-between sticky top-[37px] z-30 backdrop-blur-md">
@@ -47,27 +48,47 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAssistant, factoryName, in
         </Link>
       </div>
 
-      {/* Center Plant Badge */}
-      {factoryName && (
-        <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-industrial-800/80 border border-industrial-700/60 text-xs">
-          <Building2 className="w-3.5 h-3.5 text-carbon-green" />
-          <span className="font-semibold text-white">{factoryName}</span>
-          {industryType && <span className="text-industrial-400">({industryType})</span>}
-          <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-1.5 py-0.5 rounded-full font-medium flex items-center gap-1 border border-emerald-500/30">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live Telemetry
+      {/* Center Plant Badge & Read-Only Badge */}
+      <div className="hidden md:flex items-center space-x-3">
+        {factoryName && (
+          <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-industrial-800/80 border border-industrial-700/60 text-xs">
+            <Building2 className="w-3.5 h-3.5 text-carbon-green" />
+            <span className="font-semibold text-white">{factoryName}</span>
+            {industryType && <span className="text-industrial-400">({industryType})</span>}
+            <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-1.5 py-0.5 rounded-full font-medium flex items-center gap-1 border border-emerald-500/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live
+            </span>
+          </div>
+        )}
+
+        {isReadOnly && (
+          <span className="px-3 py-1 text-xs font-mono font-bold tracking-tight rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 animate-pulse">
+            READ ONLY — REGULATOR / AUDITOR
           </span>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Right Action Icons */}
       <div className="flex items-center space-x-3">
-        <button
-          onClick={onOpenAssistant}
-          className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-carbon-cyber/15 border border-carbon-cyber/40 text-carbon-cyber hover:bg-carbon-cyber/25 transition-all text-xs font-medium shadow-glow-cyber"
-        >
-          <Bot className="w-4 h-4" />
-          <span className="hidden sm:inline">Ask CarbonCopilot</span>
-        </button>
+        {/* AI Assistant is disabled for Regulator per Section 10 */}
+        {!isReadOnly && (
+          <button
+            onClick={onOpenAssistant}
+            className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-carbon-cyber/15 border border-carbon-cyber/40 text-carbon-cyber hover:bg-carbon-cyber/25 transition-all text-xs font-medium shadow-glow-cyber"
+          >
+            <Bot className="w-4 h-4" />
+            <span className="hidden sm:inline">Ask Copilot</span>
+          </button>
+        )}
+
+        {/* Current User Role Badge */}
+        {user && (
+          <span
+            className={`text-xs font-mono font-semibold px-2.5 py-1 rounded-lg border ${roleColors.bg} ${roleColors.text} ${roleColors.border}`}
+          >
+            {ROLE_LABELS[role] || role}
+          </span>
+        )}
 
         <div className="h-6 w-px bg-industrial-700/60 mx-1"></div>
 

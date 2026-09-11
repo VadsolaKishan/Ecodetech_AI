@@ -1,7 +1,7 @@
 import json
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
-from app.models.models import Assessment, EmissionHotspot, Recommendation
+from app.models.models import Assessment, EmissionHotspot, Recommendation, RecommendationKnowledge
 
 # Industrial Circular Interventions Knowledge Base
 KNOWLEDGE_BASE = [
@@ -178,8 +178,29 @@ class RecommendationEngine:
 
         total_potential_co2_kg = 0.0
         total_potential_savings = 0.0
+        # Query active rules from database or fallback to KNOWLEDGE_BASE
+        db_rules = self.db.query(RecommendationKnowledge).filter(RecommendationKnowledge.is_active == True).all()
+        if db_rules:
+            active_rules = [
+                {
+                    "key": r.key,
+                    "title": r.title,
+                    "category": r.category,
+                    "target_source": r.target_source,
+                    "reduction_pct_range": (r.reduction_min_pct, r.reduction_max_pct),
+                    "cost_multiplier_inr_per_kw": r.cost_multiplier_inr_per_kw,
+                    "savings_rate_per_kwh": r.savings_rate_per_kwh,
+                    "feasibility": r.feasibility,
+                    "base_payback_months": r.base_payback_months,
+                    "circularity_boost": r.circularity_boost,
+                    "reason_template": r.reason_template
+                }
+                for r in db_rules
+            ]
+        else:
+            active_rules = KNOWLEDGE_BASE
 
-        for item in KNOWLEDGE_BASE:
+        for item in active_rules:
             # Find matching hotspot
             matched_hotspot = None
             for h in hotspots:

@@ -1,12 +1,10 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
-from app.database.session import engine, Base, SessionLocal
-from app.database.seed_factors import seed_emission_factors
-from app.database.demo_seed import seed_demo_factories
+from app.database.session import engine, Base
 
 # Routers
 from app.api.v1.auth import router as auth_router
@@ -18,18 +16,12 @@ from app.api.v1.action_plan import router as action_plan_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.reports import router as reports_router
 from app.api.v1.assistant import router as assistant_router
-from app.api.v1.demo import router as demo_router
+from app.api.v1.admin import router as admin_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Initialize database tables
+    # Startup: Ensure database schema tables exist without seeding any entries
     Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
-    try:
-        seed_emission_factors(db)
-        seed_demo_factories(db)
-    finally:
-        db.close()
     yield
 
 app = FastAPI(
@@ -61,7 +53,7 @@ app.include_router(action_plan_router, prefix=f"{api_v1}/action-plans", tags=["A
 app.include_router(dashboard_router, prefix=f"{api_v1}/dashboard", tags=["Dashboard Analytics"])
 app.include_router(reports_router, prefix=f"{api_v1}/reports", tags=["Reports"])
 app.include_router(assistant_router, prefix=f"{api_v1}/assistant", tags=["AI Copilot Assistant"])
-app.include_router(demo_router, prefix=f"{api_v1}/demo", tags=["Demo Mode"])
+app.include_router(admin_router, prefix=f"{api_v1}/admin", tags=["Admin & RBAC Management"])
 
 @app.get("/")
 def root():
@@ -78,16 +70,16 @@ def root():
 def health():
     return {"status": "healthy", "service": "CarbonCopilot Backend"}
 
-# Custom Exception Handler for Standardized Error Format
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
-        status_code=500,
+        status_code=exc.status_code,
         content={
             "success": False,
             "error": {
-                "code": "INTERNAL_SERVER_ERROR",
-                "message": str(exc)
+                "code": f"HTTP_{exc.status_code}",
+                "message": exc.detail
             }
-        }
+        },
+        headers=exc.headers
     )

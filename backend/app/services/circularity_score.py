@@ -46,7 +46,7 @@ class CircularityScoringEngine:
         # Avg supplier distance & rail/EV mode bonus
         avg_dist = 100.0
         if assessment.material_inputs:
-            avg_dist = sum(m.supplier_distance_km for m in assessment.material_inputs) / len(assessment.material_inputs)
+            avg_dist = sum(getattr(m, 'supplier_distance_km', 100.0) for m in assessment.material_inputs) / len(assessment.material_inputs)
         dist_score = max(0.0, 10.0 - (avg_dist / 100.0) * 5.0) # closer suppliers get up to 10 pts
 
         mode_bonus = 0.0

@@ -1,7 +1,7 @@
 import axios from "axios";
 import {
   User, Industry, Assessment, SimulatorResult,
-  Scenario, ActionPlanItem, DashboardSummary, DemoFactory
+  Scenario, ActionPlanItem, DashboardSummary
 } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
@@ -174,22 +174,61 @@ export const assistantApi = {
   },
 };
 
-export const demoApi = {
-  getFactories: async () => {
-    const res = await apiClient.get("/demo/factories");
-    return res.data.data as DemoFactory[];
+
+export const adminApi = {
+  getUsers: async () => {
+    const res = await apiClient.get("/admin/users");
+    return res.data.data;
   },
-  loadFactory: async (factoryId: number) => {
-    const res = await apiClient.post(`/demo/load/${factoryId}`);
-    if (res.data.data?.token) {
-      localStorage.setItem("carbon_token", res.data.data.token);
-      localStorage.setItem("carbon_user", JSON.stringify(res.data.data.user));
-      if (res.data.data.assessment_id) {
-        localStorage.setItem("carbon_active_assessment", res.data.data.assessment_id.toString());
-      }
-    }
+  createUser: async (userData: any) => {
+    const res = await apiClient.post("/admin/users", userData);
+    return res.data;
+  },
+  updateUserRole: async (userId: number, role: string) => {
+    const res = await apiClient.put(`/admin/users/${userId}/role`, { role });
+    return res.data;
+  },
+  updateUserStatus: async (userId: number, isActive: boolean) => {
+    const res = await apiClient.put(`/admin/users/${userId}/status`, { is_active: isActive });
+    return res.data;
+  },
+  getIndustries: async () => {
+    const res = await apiClient.get("/admin/industries");
+    return res.data.data;
+  },
+  assignConsultant: async (consultantId: number, industryId: number) => {
+    const res = await apiClient.post("/admin/industries/assign-consultant", {
+      consultant_id: consultantId,
+      industry_id: industryId,
+    });
+    return res.data;
+  },
+  getEmissionFactors: async () => {
+    const res = await apiClient.get("/admin/emission-factors");
+    return res.data.data;
+  },
+  createEmissionFactor: async (factorData: any) => {
+    const res = await apiClient.post("/admin/emission-factors", factorData);
+    return res.data;
+  },
+  updateEmissionFactor: async (factorId: number, factorData: any) => {
+    const res = await apiClient.put(`/admin/emission-factors/${factorId}`, factorData);
+    return res.data;
+  },
+  getRecommendationKnowledge: async () => {
+    const res = await apiClient.get("/admin/recommendation-knowledge");
+    return res.data.data;
+  },
+  createRecommendationKnowledge: async (knowledgeData: any) => {
+    const res = await apiClient.post("/admin/recommendation-knowledge", knowledgeData);
+    return res.data;
+  },
+  getAuditLogs: async (actionFilter?: string) => {
+    const url = actionFilter ? `/admin/audit-logs?action=${actionFilter}` : "/admin/audit-logs";
+    const res = await apiClient.get(url);
     return res.data.data;
   },
 };
 
 export default apiClient;
+
