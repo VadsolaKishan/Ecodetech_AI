@@ -12,9 +12,7 @@ import {
   Sparkles,
   Plus,
   Trash,
-  Sliders,
-  ScanLine,
-  FileText
+  ScanLine
 } from "lucide-react";
 import { assessmentApi } from "../services/api";
 import { BillOcrModal, SuggestedItem } from "../components/BillOcrModal";
@@ -208,8 +206,8 @@ export const AssessmentWizardPage: React.FC<AssessmentWizardPageProps> = ({
         assessment_period: "Monthly Operational Audit",
         monthly_production: monthlyProduction,
         production_unit: productionUnit,
-        energy_inputs: energyInputs.map(({ is_ocr_filled, ...rest }) => rest),
-        material_inputs: materialInputs.map(({ is_ocr_filled, ...rest }) => rest),
+        energy_inputs: energyInputs.map(({ is_ocr_filled: _, ...rest }) => rest),
+        material_inputs: materialInputs.map(({ is_ocr_filled: _, ...rest }) => rest),
         waste_inputs: wasteInputs,
         transport_inputs: transportInputs,
       };

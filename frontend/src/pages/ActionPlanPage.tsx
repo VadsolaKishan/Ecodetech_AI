@@ -7,13 +7,11 @@ import {
   AlertCircle, 
   User, 
   Calendar, 
-  CircleDollarSign, 
-  TrendingDown, 
   Trash, 
   X,
-  Sparkles
+  Loader2
 } from "lucide-react";
-import { actionPlanApi, dashboardApi } from "../services/api";
+import { actionPlanApi } from "../services/api";
 import { ActionPlanItem } from "../types";
 
 interface ActionPlanPageProps {
@@ -21,10 +19,8 @@ interface ActionPlanPageProps {
   activeFactoryName?: string;
 }
 
-export const ActionPlanPage: React.FC<ActionPlanPageProps> = ({ activeAssessmentId, activeFactoryName }) => {
-  const [assessmentId, setAssessmentId] = useState<number | null>(() => {
-    return activeAssessmentId !== undefined ? activeAssessmentId : null;
-  });
+export const ActionPlanPage: React.FC<ActionPlanPageProps> = ({ activeAssessmentId }) => {
+  const assessmentId = activeAssessmentId ?? null;
   const [actions, setActions] = useState<ActionPlanItem[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -39,7 +35,7 @@ export const ActionPlanPage: React.FC<ActionPlanPageProps> = ({ activeAssessment
   const [newCo2Cut, setNewCo2Cut] = useState(15000);
 
   const fetchActions = async (targetId?: number) => {
-    const id = targetId !== undefined ? targetId : (activeAssessmentId || assessmentId);
+    const id = targetId !== undefined ? targetId : assessmentId;
     if (!id) {
       setActions([]);
       setLoading(false);
@@ -58,7 +54,6 @@ export const ActionPlanPage: React.FC<ActionPlanPageProps> = ({ activeAssessment
   };
 
   useEffect(() => {
-    setAssessmentId(activeAssessmentId !== undefined ? activeAssessmentId : null);
     if (activeAssessmentId) {
       fetchActions(activeAssessmentId);
     } else {
@@ -171,13 +166,22 @@ export const ActionPlanPage: React.FC<ActionPlanPageProps> = ({ activeAssessment
       {/* Empty State Notice */}
       {actions.length === 0 && (
         <div className="p-8 text-center rounded-2xl bg-industrial-900/60 border border-industrial-800 space-y-3">
-          <div className="w-12 h-12 rounded-xl bg-industrial-950 border border-industrial-800 text-carbon-green flex items-center justify-center mx-auto">
-            <CheckSquare className="w-6 h-6 text-industrial-400" />
-          </div>
-          <h3 className="text-base font-bold text-white">No actions added yet</h3>
-          <p className="text-xs text-industrial-400 max-w-sm mx-auto">
-            Convert high-ROI circular recommendations into trackable milestones or click 'Add Custom Action' to schedule decarbonization tasks.
-          </p>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-6 space-y-2">
+              <Loader2 className="w-7 h-7 text-carbon-green animate-spin" />
+              <p className="text-xs font-mono text-industrial-400">Loading action items...</p>
+            </div>
+          ) : (
+            <>
+              <div className="w-12 h-12 rounded-xl bg-industrial-950 border border-industrial-800 text-carbon-green flex items-center justify-center mx-auto">
+                <CheckSquare className="w-6 h-6 text-industrial-400" />
+              </div>
+              <h3 className="text-base font-bold text-white">No actions added yet</h3>
+              <p className="text-xs text-industrial-400 max-w-sm mx-auto">
+                Convert high-ROI circular recommendations into trackable milestones or click 'Add Custom Action' to schedule decarbonization tasks.
+              </p>
+            </>
+          )}
         </div>
       )}
 
