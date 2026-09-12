@@ -1,4 +1,4 @@
-# CarbonCopilot AI
+# EcoDetect AI
 
 > **Detect. Recommend. Simulate. Reduce.**  
 > *From emissions to action.*
