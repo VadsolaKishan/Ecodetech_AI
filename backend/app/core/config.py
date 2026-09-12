@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     
     # AI / LLM Configuration (Google Gemini)
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", os.getenv("LLM_API_KEY", ""))
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
     WEATHER_API_KEY: str = os.getenv("WEATHER_API_KEY", "")
     MAPS_API_KEY: str = os.getenv("MAPS_API_KEY", "")

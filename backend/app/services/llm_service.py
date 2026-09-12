@@ -27,7 +27,7 @@ BEHAVIOR AND GUIDELINES:
 class GeminiService:
     def __init__(self):
         self.api_key = settings.GEMINI_API_KEY or settings.LLM_API_KEY
-        self.model_name = settings.GEMINI_MODEL or "gemini-1.5-flash"
+        self.model_name = settings.GEMINI_MODEL or "gemini-3.6-flash"
         self._client = None
         
         if self.api_key:
