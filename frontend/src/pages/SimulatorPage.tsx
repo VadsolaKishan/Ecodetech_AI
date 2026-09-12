@@ -21,12 +21,12 @@ import { SimulatorResult, Scenario } from "../types";
 
 interface SimulatorPageProps {
   activeAssessmentId?: number;
+  activeFactoryName?: string;
 }
 
-export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId }) => {
+export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId, activeFactoryName }) => {
   const [assessmentId, setAssessmentId] = useState<number | null>(() => {
-    const saved = localStorage.getItem("carbon_active_assessment");
-    return activeAssessmentId || (saved ? parseInt(saved) : null);
+    return activeAssessmentId !== undefined ? activeAssessmentId : null;
   });
 
   // Sliders State
@@ -43,17 +43,23 @@ export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId
   const [saving, setSaving] = useState(false);
   const [savedScenarios, setSavedScenarios] = useState<Scenario[]>([]);
 
-  // Update active assessment if prop changes
+  // Update active assessment whenever prop changes
   useEffect(() => {
-    if (activeAssessmentId) {
-      setAssessmentId(activeAssessmentId);
+    setAssessmentId(activeAssessmentId !== undefined ? activeAssessmentId : null);
+    if (!activeAssessmentId) {
+      setSimResult(null);
+      setSavedScenarios([]);
     }
   }, [activeAssessmentId]);
 
   const fetchSavedScenarios = async (idToUse?: number) => {
+    const targetId = idToUse !== undefined ? idToUse : (activeAssessmentId || assessmentId);
+    if (!targetId) {
+      setSavedScenarios([]);
+      return;
+    }
     try {
-      const targetId = idToUse || assessmentId || activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "0");
-      const list = await simulatorApi.getScenarios(targetId, true);
+      const list = await simulatorApi.getScenarios(targetId);
       if (list && Array.isArray(list)) {
         setSavedScenarios(list.filter((s) => (s.id ?? 0) > 0));
       }
@@ -63,12 +69,18 @@ export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId
   };
 
   useEffect(() => {
-    fetchSavedScenarios();
+    if (activeAssessmentId || assessmentId) {
+      fetchSavedScenarios();
+    }
   }, [assessmentId, activeAssessmentId]);
 
   // Recalculate simulation on slider change
   const runSimulation = async () => {
-    const targetId = assessmentId || activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "0");
+    const targetId = activeAssessmentId || assessmentId;
+    if (!targetId) {
+      setSimResult(null);
+      return;
+    }
     try {
       setLoading(true);
       const res = await simulatorApi.calculate(targetId, {
@@ -86,12 +98,14 @@ export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId
   };
 
   useEffect(() => {
-    runSimulation();
+    if (activeAssessmentId || assessmentId) {
+      runSimulation();
+    }
   }, [assessmentId, activeAssessmentId, solarPct, recycledPct, wasteRecPct, transportRedPct]);
 
   const handleSaveScenario = async () => {
-    const targetId = assessmentId || activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "0");
-    if (!simResult) {
+    const targetId = activeAssessmentId || assessmentId;
+    if (!targetId || !simResult) {
       alert("Please wait for simulation results to compute before saving.");
       return;
     }
@@ -182,13 +196,34 @@ export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId
         </div>
       )}
 
-      {/* Main Grid: Sliders on Left, Live Results on Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Reactive Interactive Sliders (5 cols) */}
-        <div className="lg:col-span-5 space-y-6">
-          <div className="p-6 rounded-2xl bg-industrial-900/90 border border-industrial-800 shadow-card-dark space-y-6">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2 pb-3 border-b border-industrial-800">
-              <Sliders className="w-4 h-4 text-carbon-green" />
+      {!(activeAssessmentId || assessmentId) ? (
+        <div className="p-12 text-center rounded-2xl bg-industrial-900/60 border border-industrial-800 space-y-4">
+          <div className="w-12 h-12 rounded-xl bg-industrial-950 border border-industrial-800 text-carbon-green flex items-center justify-center mx-auto">
+            <Sliders className="w-6 h-6 text-industrial-400" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-white">No Assessment Data for {activeFactoryName || "this facility"}</h3>
+            <p className="text-xs text-industrial-400 max-w-md mx-auto">
+              Please run or import a carbon assessment for this facility to start simulating operational decarbonization levers.
+            </p>
+          </div>
+          <Link
+            to="/assessment/new"
+            className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-carbon-green text-industrial-950 font-bold text-xs hover:bg-carbon-lime transition shadow-glow-green"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Run New Carbon Assessment</span>
+          </Link>
+        </div>
+      ) : (
+        <>
+          {/* Main Grid: Sliders on Left, Live Results on Right */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Left Column: Reactive Interactive Sliders (5 cols) */}
+            <div className="lg:col-span-5 space-y-6">
+              <div className="p-6 rounded-2xl bg-industrial-900/90 border border-industrial-800 shadow-card-dark space-y-6">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2 pb-3 border-b border-industrial-800">
+                  <Sliders className="w-4 h-4 text-carbon-green" />
               <span>Decarbonization Levers</span>
             </h3>
 
@@ -452,6 +487,8 @@ export const SimulatorPage: React.FC<SimulatorPageProps> = ({ activeAssessmentId
             ))}
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

@@ -106,6 +106,7 @@ class TransportInputItem(BaseModel):
 
 # Assessment
 class AssessmentCreate(BaseModel):
+    industry_id: Optional[int] = None
     name: Optional[str] = "Factory Carbon Assessment"
     assessment_period: Optional[str] = "Monthly 2026"
     energy_inputs: List[EnergyInputItem] = []
@@ -179,9 +180,13 @@ class AssessmentOut(BaseModel):
     potential_savings_inr: float
     confidence_level: str
     created_at: datetime
+    industry_id: Optional[int] = None
+    factory_id: Optional[int] = None
+    factory_name: Optional[str] = None
 
     class Config:
         from_attributes = True
+
 
 class AssessmentFullDetail(AssessmentOut):
     industry: Optional[IndustryOut] = None

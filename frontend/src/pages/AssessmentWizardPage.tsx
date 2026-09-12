@@ -21,16 +21,24 @@ import { BillOcrModal, SuggestedItem } from "../components/BillOcrModal";
 
 interface AssessmentWizardPageProps {
   onAssessmentCreated: (id: number) => void;
+  activeFactoryId?: number;
+  activeFactoryName?: string;
 }
 
-export const AssessmentWizardPage: React.FC<AssessmentWizardPageProps> = ({ onAssessmentCreated }) => {
+export const AssessmentWizardPage: React.FC<AssessmentWizardPageProps> = ({
+  onAssessmentCreated,
+  activeFactoryId,
+  activeFactoryName,
+}) => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState(0);
 
   // Form State
-  const [assessmentName, setAssessmentName] = useState("Facility Carbon Audit 2026");
+  const [assessmentName, setAssessmentName] = useState(
+    activeFactoryName ? `${activeFactoryName} - Carbon Audit 2026` : "Facility Carbon Audit 2026"
+  );
   const [monthlyProduction, setMonthlyProduction] = useState(120);
   const [productionUnit, setProductionUnit] = useState("tonnes fabric");
 
@@ -196,6 +204,7 @@ export const AssessmentWizardPage: React.FC<AssessmentWizardPageProps> = ({ onAs
     try {
       const payload = {
         name: assessmentName,
+        industry_id: activeFactoryId,
         assessment_period: "Monthly Operational Audit",
         monthly_production: monthlyProduction,
         production_unit: productionUnit,
@@ -223,6 +232,12 @@ export const AssessmentWizardPage: React.FC<AssessmentWizardPageProps> = ({ onAs
     <div className="flex-1 p-6 lg:p-10 max-w-5xl mx-auto text-white">
       {/* Stepper Header */}
       <div className="mb-8">
+        {activeFactoryName && (
+          <div className="inline-flex items-center gap-2 px-3 py-1 mb-2 rounded-full bg-carbon-green/15 border border-carbon-green/40 text-carbon-green text-xs font-mono font-semibold">
+            <Factory className="w-3.5 h-3.5" />
+            <span>Target Facility: <strong>{activeFactoryName}</strong></span>
+          </div>
+        )}
         <h1 className="text-2xl font-bold tracking-tight mb-2">Industrial Carbon Assessment Wizard</h1>
         <p className="text-xs text-industrial-400">
           Enter your facility's monthly resource consumption to pinpoint leak points and circular interventions.

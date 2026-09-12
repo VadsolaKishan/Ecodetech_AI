@@ -20,19 +20,25 @@ import { Assessment } from "../types";
 
 interface HistoryPageProps {
   onSelectAssessment: (id: number) => void;
+  activeFactoryId?: number;
+  activeFactoryName?: string;
 }
 
-export const HistoryPage: React.FC<HistoryPageProps> = ({ onSelectAssessment }) => {
+export const HistoryPage: React.FC<HistoryPageProps> = ({
+  onSelectAssessment,
+  activeFactoryId,
+  activeFactoryName,
+}) => {
   const navigate = useNavigate();
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterMode, setFilterMode] = useState<"current" | "all">("current");
 
   const fetchHistory = async () => {
     try {
-      if (assessments.length === 0) {
-        setLoading(true);
-      }
-      const data = await assessmentApi.list();
+      setLoading(true);
+      const targetFactory = filterMode === "current" ? activeFactoryId : undefined;
+      const data = await assessmentApi.list(true, targetFactory);
       setAssessments(data);
     } catch (err) {
       console.error(err);
@@ -43,7 +49,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ onSelectAssessment }) 
 
   useEffect(() => {
     fetchHistory();
-  }, []);
+  }, [filterMode, activeFactoryId]);
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -76,13 +82,43 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ onSelectAssessment }) 
           </p>
         </div>
 
-        <button
-          onClick={() => navigate("/assessment/new")}
-          className="px-4 py-2.5 rounded-xl bg-carbon-green text-industrial-950 hover:bg-carbon-green-hover text-xs font-bold flex items-center space-x-2 shadow-glow-green transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Assessment</span>
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Facility Filter Pills */}
+          {activeFactoryId && (
+            <div className="flex items-center p-1 rounded-xl bg-industrial-900 border border-industrial-800 text-xs font-mono">
+              <button
+                type="button"
+                onClick={() => setFilterMode("current")}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  filterMode === "current"
+                    ? "bg-carbon-green text-industrial-950 font-bold shadow-sm"
+                    : "text-industrial-400 hover:text-white"
+                }`}
+              >
+                🏢 {activeFactoryName || "Active Plant"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterMode("all")}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  filterMode === "all"
+                    ? "bg-carbon-green text-industrial-950 font-bold shadow-sm"
+                    : "text-industrial-400 hover:text-white"
+                }`}
+              >
+                🌐 All Facilities
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={() => navigate("/assessment/new")}
+            className="px-4 py-2.5 rounded-xl bg-carbon-green text-industrial-950 hover:bg-carbon-green-hover text-xs font-bold flex items-center space-x-2 shadow-glow-green transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Assessment</span>
+          </button>
+        </div>
       </div>
 
       {/* Table Card Container */}
@@ -132,8 +168,13 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ onSelectAssessment }) 
                     >
                       {/* Column 1: Assessment Name */}
                       <td className="py-4 px-5">
-                        <div className="font-bold text-white text-sm group-hover:text-carbon-green transition-colors flex items-center gap-2">
+                        <div className="font-bold text-white text-sm group-hover:text-carbon-green transition-colors flex items-center gap-2 flex-wrap">
                           <span>{a.name}</span>
+                          {a.factory_name && (
+                            <span className="px-2 py-0.5 rounded-md bg-carbon-green/15 border border-carbon-green/30 text-carbon-green text-[10px] font-mono font-semibold">
+                              🏢 {a.factory_name}
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-industrial-500 font-mono mt-0.5">
                           ID: #{a.id} • Verified Audit

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Lightbulb,
@@ -13,17 +14,20 @@ import {
   Sparkles,
   X,
   ShieldCheck,
-  FileCheck
+  FileCheck,
+  ArrowRight
 } from "lucide-react";
 import { analysisApi, dashboardApi, actionPlanApi } from "../services/api";
 import { Recommendation } from "../types";
 
 interface RecommendationsPageProps {
   activeAssessmentId?: number;
+  activeFactoryName?: string;
 }
 
-export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ activeAssessmentId }) => {
+export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ activeAssessmentId, activeFactoryName }) => {
   const navigate = useNavigate();
+  const { isReadOnly } = useAuth();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [activeModalRec, setActiveModalRec] = useState<Recommendation | null>(null);
@@ -32,17 +36,22 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ active
   const [addingId, setAddingId] = useState<number | null>(null);
 
   const fetchRecs = async () => {
+    if (!activeAssessmentId) {
+      setRecommendations([]);
+      setLoading(false);
+      return;
+    }
     try {
-      if (recommendations.length === 0) {
-        setLoading(true);
-      }
-      const targetId = activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "0");
-      const data = await analysisApi.getRecommendations(targetId, true);
+      setLoading(true);
+      const data = await analysisApi.getRecommendations(activeAssessmentId);
       if (data && Array.isArray(data)) {
         setRecommendations(data);
+      } else {
+        setRecommendations([]);
       }
     } catch (err) {
       console.error(err);
+      setRecommendations([]);
     } finally {
       setLoading(false);
     }
@@ -53,23 +62,25 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ active
   }, [activeAssessmentId]);
 
   const handleAddToActionPlan = async (rec: Recommendation) => {
-    const targetId = rec.assessment_id || activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "0");
+    const targetId = rec.assessment_id || activeAssessmentId;
+    if (!targetId) return;
     try {
       setAddingId(rec.id);
       await actionPlanApi.create(targetId, {
         recommendation_id: rec.id,
         title: rec.title,
         category: rec.category,
-        priority: rec.priority_rank === 1 ? "High" : "Medium",
-        estimated_cost_inr: rec.implementation_cost_inr,
-        expected_co2_reduction_kg: rec.estimated_co2_reduction_kg,
+        priority: rec.priority_rank === 1 ? "High" : rec.priority_rank <= 3 ? "Medium" : "Low",
+        owner: "Factory Operations Team",
+        deadline: "Q4 2026",
+        estimated_cost_inr: rec.cost_inr,
+        expected_co2_reduction_kg: rec.co2_cut_kg,
         status: "Planned",
       });
-      setToastMsg(`Successfully added "${rec.title.slice(0, 32)}..." to Action Plan!`);
-      setTimeout(() => setToastMsg(null), 3500);
-    } catch (err: any) {
-      console.error("Failed to add to action plan:", err);
-      alert(err.response?.data?.detail || "Failed to add to Action Plan. Please try again.");
+      setToastMsg(`Added "${rec.title}" to Action Roadmap!`);
+      setTimeout(() => setToastMsg(null), 3000);
+    } catch (err) {
+      console.error(err);
     } finally {
       setAddingId(null);
     }
@@ -79,12 +90,39 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ active
     ? recommendations
     : recommendations.filter((r) => r.category.toLowerCase() === selectedCategory.toLowerCase());
 
-  if (loading && recommendations.length === 0) {
+  if (loading && !isReadOnly) {
     return (
       <div className="flex-1 p-8 flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-3">
           <div className="w-8 h-8 border-2 border-carbon-green border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-xs font-mono text-industrial-400">Scoring circular economy alternatives...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!activeAssessmentId || recommendations.length === 0) {
+    return (
+      <div className="flex-1 p-8 max-w-4xl mx-auto text-center py-20 space-y-6">
+        <div className="w-16 h-16 rounded-2xl bg-carbon-lime/10 border border-carbon-lime/30 text-carbon-lime flex items-center justify-center mx-auto shadow-glow-lime">
+          <Sparkles className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-bold text-white tracking-tight">
+          {activeFactoryName ? `No Recommendations Found for ${activeFactoryName}` : "No Active Carbon Audit Found"}
+        </h2>
+        <p className="text-sm text-industrial-400 max-w-md mx-auto">
+          {activeFactoryName
+            ? `Run a carbon assessment for ${activeFactoryName} to receive tailored CAPEX models, fuel switching pathways, and ROI-ranked circular interventions.`
+            : "Select a facility or run an assessment to unlock AI-generated circular interventions."}
+        </p>
+        <div className="flex justify-center gap-4 pt-2">
+          <Link
+            to="/assessment/new"
+            className="px-6 py-2.5 rounded-xl bg-carbon-green text-industrial-950 font-bold text-xs hover:bg-carbon-lime transition-all shadow-glow-green flex items-center space-x-2"
+          >
+            <span>Run Facility Assessment</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
       </div>
     );

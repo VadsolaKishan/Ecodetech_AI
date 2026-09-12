@@ -18,11 +18,12 @@ import { ActionPlanItem } from "../types";
 
 interface ActionPlanPageProps {
   activeAssessmentId?: number;
+  activeFactoryName?: string;
 }
 
-export const ActionPlanPage: React.FC<ActionPlanPageProps> = ({ activeAssessmentId }) => {
+export const ActionPlanPage: React.FC<ActionPlanPageProps> = ({ activeAssessmentId, activeFactoryName }) => {
   const [assessmentId, setAssessmentId] = useState<number | null>(() => {
-    return activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "1");
+    return activeAssessmentId !== undefined ? activeAssessmentId : null;
   });
   const [actions, setActions] = useState<ActionPlanItem[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -37,24 +38,33 @@ export const ActionPlanPage: React.FC<ActionPlanPageProps> = ({ activeAssessment
   const [newCost, setNewCost] = useState(250000);
   const [newCo2Cut, setNewCo2Cut] = useState(15000);
 
-  const fetchActions = async () => {
+  const fetchActions = async (targetId?: number) => {
+    const id = targetId !== undefined ? targetId : (activeAssessmentId || assessmentId);
+    if (!id) {
+      setActions([]);
+      setLoading(false);
+      return;
+    }
     try {
-      const targetId = assessmentId || activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "1");
-      const data = await actionPlanApi.list(targetId);
-      setActions(data);
+      setLoading(true);
+      const data = await actionPlanApi.list(id);
+      setActions(data || []);
     } catch (err) {
       console.error(err);
+      setActions([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (activeAssessmentId && activeAssessmentId !== assessmentId) {
-      setAssessmentId(activeAssessmentId);
+    setAssessmentId(activeAssessmentId !== undefined ? activeAssessmentId : null);
+    if (activeAssessmentId) {
+      fetchActions(activeAssessmentId);
+    } else {
+      setActions([]);
     }
-    fetchActions();
-  }, [assessmentId, activeAssessmentId]);
+  }, [activeAssessmentId]);
 
   const handleStatusChange = async (actionId: number, nextStatus: "Planned" | "In Progress" | "Completed") => {
     try {

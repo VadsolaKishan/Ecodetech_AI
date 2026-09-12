@@ -6,6 +6,7 @@ import { Scenario } from "../types";
 
 interface ScenarioComparisonPageProps {
   activeAssessmentId?: number;
+  activeFactoryName?: string;
 }
 
 const formatINR = (val: number) => {
@@ -14,17 +15,19 @@ const formatINR = (val: number) => {
   return `₹${Math.round(val).toLocaleString("en-IN")}`;
 };
 
-export const ScenarioComparisonPage: React.FC<ScenarioComparisonPageProps> = ({ activeAssessmentId }) => {
+export const ScenarioComparisonPage: React.FC<ScenarioComparisonPageProps> = ({ activeAssessmentId, activeFactoryName }) => {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchScenarios = async () => {
+    if (!activeAssessmentId) {
+      setScenarios([]);
+      setLoading(false);
+      return;
+    }
     try {
-      if (scenarios.length === 0) {
-        setLoading(true);
-      }
-      const targetId = activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "0");
-      const list = await simulatorApi.getScenarios(targetId, true);
+      setLoading(true);
+      const list = await simulatorApi.getScenarios(activeAssessmentId);
       setScenarios(list || []);
     } catch (err) {
       console.error("Failed to fetch scenarios:", err);
@@ -89,7 +92,7 @@ export const ScenarioComparisonPage: React.FC<ScenarioComparisonPageProps> = ({ 
           <div className="w-12 h-12 rounded-xl bg-industrial-950 border border-industrial-800 text-carbon-green flex items-center justify-center mx-auto">
             <GitCompare className="w-6 h-6 text-industrial-400" />
           </div>
-          <h3 className="text-base font-bold text-white">No scenarios created yet</h3>
+          <h3 className="text-base font-bold text-white">No scenarios created yet {activeFactoryName ? `for ${activeFactoryName}` : ""}</h3>
           <p className="text-xs text-industrial-400 max-w-sm mx-auto">
             Use the What-If Simulator to test decarbonization levers and save comparative scenario trajectories.
           </p>

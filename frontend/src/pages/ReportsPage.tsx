@@ -9,49 +9,61 @@ import {
   Lightbulb, 
   CheckSquare, 
   Info,
-  Calendar
+  Calendar,
+  Sparkles
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { reportApi, dashboardApi } from "../services/api";
 
 interface ReportsPageProps {
   activeAssessmentId?: number;
+  activeFactoryName?: string;
 }
 
-export const ReportsPage: React.FC<ReportsPageProps> = ({ activeAssessmentId }) => {
+export const ReportsPage: React.FC<ReportsPageProps> = ({ activeAssessmentId, activeFactoryName }) => {
   const [assessmentId, setAssessmentId] = useState<number | null>(() => {
-    return activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "1");
+    return activeAssessmentId !== undefined ? activeAssessmentId : null;
   });
   const [report, setReport] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  const fetchReport = async () => {
+  const fetchReport = async (targetId?: number) => {
+    const id = targetId !== undefined ? targetId : (activeAssessmentId || assessmentId);
+    if (!id) {
+      setReport(null);
+      setLoading(false);
+      return;
+    }
     try {
-      if (!report) {
-        setLoading(true);
-      }
-      const targetId = assessmentId || activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "1");
-      const data = await reportApi.getReport(targetId);
+      setLoading(true);
+      const data = await reportApi.getReport(id);
       if (data) {
         setReport(data);
+      } else {
+        setReport(null);
       }
     } catch (err) {
       console.error("Failed to load report", err);
+      setReport(null);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (activeAssessmentId && activeAssessmentId !== assessmentId) {
-      setAssessmentId(activeAssessmentId);
+    setAssessmentId(activeAssessmentId !== undefined ? activeAssessmentId : null);
+    if (activeAssessmentId) {
+      fetchReport(activeAssessmentId);
+    } else {
+      setReport(null);
     }
-    fetchReport();
-  }, [assessmentId, activeAssessmentId]);
+  }, [activeAssessmentId]);
 
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const handleDownloadPdf = async () => {
-    const targetId = assessmentId || activeAssessmentId || 1;
+    const targetId = activeAssessmentId || assessmentId;
+    if (!targetId) return;
     setDownloadingPdf(true);
     try {
       await reportApi.downloadPdf(targetId);
@@ -80,8 +92,25 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ activeAssessmentId }) 
 
   if (!report) {
     return (
-      <div className="flex-1 p-8 text-center py-20 text-industrial-400">
-        No active assessment report data found.
+      <div className="flex-1 p-6 lg:p-10 space-y-8 max-w-5xl mx-auto text-white">
+        <div className="p-12 text-center rounded-2xl bg-industrial-900/60 border border-industrial-800 space-y-4">
+          <div className="w-12 h-12 rounded-xl bg-industrial-950 border border-industrial-800 text-carbon-green flex items-center justify-center mx-auto">
+            <FileText className="w-6 h-6 text-industrial-400" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-white">No Executive Report Available {activeFactoryName ? `for ${activeFactoryName}` : ""}</h3>
+            <p className="text-xs text-industrial-400 max-w-md mx-auto">
+              Please run or import a carbon assessment for this facility to generate ISO 14064 & GHG Protocol compliant documentation.
+            </p>
+          </div>
+          <Link
+            to="/assessment/new"
+            className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-carbon-green text-industrial-950 font-bold text-xs hover:bg-carbon-lime transition shadow-glow-green"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Run New Carbon Assessment</span>
+          </Link>
+        </div>
       </div>
     );
   }

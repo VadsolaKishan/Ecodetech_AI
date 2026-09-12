@@ -142,6 +142,15 @@ class Assessment(Base):
     data_confidence_records = relationship("DataConfidence", back_populates="assessment", cascade="all, delete-orphan")
     reports = relationship("Report", back_populates="assessment", cascade="all, delete-orphan")
 
+    @property
+    def factory_name(self) -> str:
+        if self.factory and self.factory.name:
+            return self.factory.name
+        if self.industry and self.industry.company_name:
+            return self.industry.company_name
+        return "Industrial Facility"
+
+
 # 7. ENERGY INPUTS
 class EnergyInput(Base):
     __tablename__ = "energy_inputs"

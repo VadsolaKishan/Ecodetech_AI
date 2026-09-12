@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, Request, File, UploadFile, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database.session import get_db
@@ -26,6 +26,7 @@ router = APIRouter()
 
 @router.get("", response_model=ApiResponse)
 def list_assessments(
+    factory_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -60,6 +61,25 @@ def list_assessments(
             owned_ids.append(current_user.industry_id)
         query = query.filter(Assessment.industry_id.in_(owned_ids) if owned_ids else Assessment.user_id == current_user.id)
 
+    # Apply specific factory filter if requested
+    if factory_id:
+        target_ind = db.query(Industry).filter(Industry.id == factory_id).first()
+        if target_ind:
+            fac_ids = [f.id for f in db.query(Factory).filter(Factory.industry_id == target_ind.id).all()]
+            query = query.filter(
+                (Assessment.industry_id == target_ind.id) | (Assessment.factory_id.in_(fac_ids))
+            )
+        else:
+            target_fac = db.query(Factory).filter(Factory.id == factory_id).first()
+            if target_fac:
+                query = query.filter(
+                    (Assessment.factory_id == target_fac.id) | (Assessment.industry_id == target_fac.industry_id)
+                )
+            else:
+                query = query.filter(
+                    (Assessment.industry_id == factory_id) | (Assessment.factory_id == factory_id)
+                )
+
     assessments = query.order_by(Assessment.created_at.desc()).all()
     results = [AssessmentOut.from_orm(a).dict() for a in assessments]
     return ApiResponse(success=True, data=results)
@@ -74,42 +94,50 @@ def create_assessment(
     user_role = (current_user.role or "").lower()
     
     # Resolve target industry
-    if user_role == UserRole.SUSTAINABILITY_CONSULTANT:
-        # Consultant must specify or have an assigned factory
-        assignment = db.query(FactoryAssignment).filter(
-            FactoryAssignment.user_id == current_user.id,
-            FactoryAssignment.role == "sustainability_consultant"
-        ).first()
-        if not assignment:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You have not been assigned to any factory to create assessments"
-            )
-        industry = assignment.industry or (db.query(Industry).filter(Industry.id == assignment.factory_id).first() if assignment.factory_id else None)
-        if not industry:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Assigned factory could not be found"
-            )
-    else:
-        # Factory owner or Admin
-        industry = None
-        if current_user.industry_id:
-            industry = db.query(Industry).filter(Industry.id == current_user.industry_id).first()
-        if not industry:
-            industry = db.query(Industry).filter(Industry.user_id == current_user.id).first()
-        if not industry:
-            industry = Industry(
-                user_id=current_user.id,
-                company_name=f"{current_user.full_name}'s Plant",
-                industry_type="Manufacturing",
-                factory_location="Industrial Park"
-            )
-            db.add(industry)
-            db.commit()
-            db.refresh(industry)
-            current_user.industry_id = industry.id
-            db.commit()
+    industry = None
+
+    if data.industry_id:
+        # If explicitly targeting a specific factory
+        target_ind = db.query(Industry).filter(Industry.id == data.industry_id).first()
+        if target_ind:
+            industry = target_ind
+
+    if not industry:
+        if user_role == UserRole.SUSTAINABILITY_CONSULTANT:
+            # Consultant must specify or have an assigned factory
+            assignment = db.query(FactoryAssignment).filter(
+                FactoryAssignment.user_id == current_user.id,
+                FactoryAssignment.role == "sustainability_consultant"
+            ).first()
+            if not assignment:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You have not been assigned to any factory to create assessments"
+                )
+            industry = assignment.industry or (db.query(Industry).filter(Industry.id == assignment.factory_id).first() if assignment.factory_id else None)
+            if not industry:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Assigned factory could not be found"
+                )
+        else:
+            # Factory owner or Admin
+            if current_user.industry_id:
+                industry = db.query(Industry).filter(Industry.id == current_user.industry_id).first()
+            if not industry:
+                industry = db.query(Industry).filter(Industry.user_id == current_user.id).first()
+            if not industry:
+                industry = Industry(
+                    user_id=current_user.id,
+                    company_name=f"{current_user.full_name}'s Plant",
+                    industry_type="Manufacturing",
+                    factory_location="Industrial Park"
+                )
+                db.add(industry)
+                db.commit()
+                db.refresh(industry)
+                current_user.industry_id = industry.id
+                db.commit()
 
     if data.monthly_production:
         industry.monthly_production = data.monthly_production

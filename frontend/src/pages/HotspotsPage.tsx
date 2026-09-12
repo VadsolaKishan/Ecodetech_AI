@@ -7,6 +7,7 @@ import { Hotspot } from "../types";
 
 interface HotspotsPageProps {
   activeAssessmentId?: number;
+  activeFactoryName?: string;
 }
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -16,23 +17,28 @@ const SEVERITY_COLORS: Record<string, string> = {
   Low: "#10B981",
 };
 
-export const HotspotsPage: React.FC<HotspotsPageProps> = ({ activeAssessmentId }) => {
+export const HotspotsPage: React.FC<HotspotsPageProps> = ({ activeAssessmentId, activeFactoryName }) => {
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
 
   const fetchHotspots = async () => {
+    if (!activeAssessmentId) {
+      setHotspots([]);
+      setLoading(false);
+      return;
+    }
     try {
-      if (hotspots.length === 0) {
-        setLoading(true);
-      }
-      const targetId = activeAssessmentId || parseInt(localStorage.getItem("carbon_active_assessment") || "0");
-      const data = await analysisApi.getHotspots(targetId, true);
+      setLoading(true);
+      const data = await analysisApi.getHotspots(activeAssessmentId);
       if (data && Array.isArray(data)) {
         setHotspots(data);
+      } else {
+        setHotspots([]);
       }
     } catch (err) {
       console.error("Failed to load hotspots:", err);
+      setHotspots([]);
     } finally {
       setLoading(false);
     }
@@ -53,12 +59,39 @@ export const HotspotsPage: React.FC<HotspotsPageProps> = ({ activeAssessmentId }
     severity: h.severity,
   }));
 
-  if (loading && hotspots.length === 0) {
+  if (loading) {
     return (
       <div className="flex-1 p-8 flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-3">
           <div className="w-8 h-8 border-2 border-carbon-critical border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-xs font-mono text-industrial-400">Pinpointing facility emission leaks...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!activeAssessmentId || hotspots.length === 0) {
+    return (
+      <div className="flex-1 p-8 max-w-4xl mx-auto text-center py-20 space-y-6">
+        <div className="w-16 h-16 rounded-2xl bg-carbon-amber/10 border border-carbon-amber/30 text-carbon-amber flex items-center justify-center mx-auto shadow-glow-amber">
+          <Flame className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-bold text-white tracking-tight">
+          {activeFactoryName ? `No Hotspots Recorded for ${activeFactoryName}` : "No Active Carbon Audit Found"}
+        </h2>
+        <p className="text-sm text-industrial-400 max-w-md mx-auto">
+          {activeFactoryName
+            ? `Run a carbon assessment for ${activeFactoryName} to detect leak points, fugitive emissions, and high-intensity materials.`
+            : "Select a facility or start an assessment to detect industrial emission hotspots."}
+        </p>
+        <div className="flex justify-center gap-4 pt-2">
+          <Link
+            to="/assessment/new"
+            className="px-6 py-2.5 rounded-xl bg-carbon-green text-industrial-950 font-bold text-xs hover:bg-carbon-lime transition-all shadow-glow-green flex items-center space-x-2"
+          >
+            <span>Run Facility Assessment</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
       </div>
     );

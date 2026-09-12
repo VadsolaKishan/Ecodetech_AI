@@ -56,6 +56,45 @@ def get_industry_profile(
         data=IndustryOut.from_orm(industry).dict()
     )
 
+@router.get("/list", response_model=ApiResponse)
+def list_available_industries(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    user_role = (current_user.role or "").lower()
+    if user_role in [UserRole.ADMIN, UserRole.REGULATOR_AUDITOR]:
+        industries = db.query(Industry).all()
+    elif user_role == UserRole.SUSTAINABILITY_CONSULTANT:
+        assignments = db.query(FactoryAssignment).filter(
+            FactoryAssignment.user_id == current_user.id,
+            FactoryAssignment.role == "sustainability_consultant"
+        ).all()
+        assigned_ids = [a.industry_id or a.factory_id for a in assignments if (a.industry_id or a.factory_id)]
+        industries = db.query(Industry).filter(Industry.id.in_(assigned_ids)).all() if assigned_ids else []
+        if not industries:
+            industries = db.query(Industry).all()
+    else:
+        # Factory Owner
+        owned = db.query(Industry).filter(Industry.user_id == current_user.id).all()
+        if current_user.industry_id and current_user.industry_id not in [o.id for o in owned]:
+            extra = db.query(Industry).filter(Industry.id == current_user.industry_id).first()
+            if extra:
+                owned.append(extra)
+        industries = owned if owned else db.query(Industry).all()
+
+    data = [
+        {
+            "id": i.id,
+            "company_name": i.company_name,
+            "industry_type": i.industry_type,
+            "factory_location": i.factory_location,
+            "monthly_production": i.monthly_production,
+            "production_unit": i.production_unit,
+        }
+        for i in industries
+    ]
+    return ApiResponse(success=True, data=data)
+
 @router.put("/profile", response_model=ApiResponse)
 def update_industry_profile(
     profile_in: IndustryUpdate,

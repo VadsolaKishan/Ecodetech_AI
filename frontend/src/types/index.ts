@@ -80,6 +80,9 @@ export interface Assessment {
   potential_savings_inr: number;
   confidence_level: string;
   created_at: string;
+  industry_id?: number;
+  factory_id?: number;
+  factory_name?: string;
   industry?: Industry;
   hotspots?: Hotspot[];
   recommendations?: Recommendation[];

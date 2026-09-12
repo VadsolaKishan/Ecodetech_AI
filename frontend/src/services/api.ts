@@ -24,6 +24,10 @@ interface CacheEntry<T> {
 const memoryCache = new Map<string, CacheEntry<any>>();
 const DEFAULT_TTL_MS = 90 * 1000; // 90 seconds in-memory cache
 
+// --- Inflight Request Deduplication ---
+// Prevents duplicate network calls when multiple components request the same URL simultaneously
+const inflightRequests = new Map<string, Promise<any>>();
+
 export const clearApiCache = (subString?: string) => {
   if (!subString) {
     memoryCache.clear();
@@ -34,6 +38,19 @@ export const clearApiCache = (subString?: string) => {
       }
     }
   }
+};
+
+// Flush all assessment-specific cached data (hotspots, recommendations, etc.)
+// Called on factory switch to ensure stale data from previous factory is removed
+export const clearAssessmentCache = () => {
+  clearApiCache("/assessments");
+  clearApiCache("/hotspots");
+  clearApiCache("/recommendations");
+  clearApiCache("/emissions");
+  clearApiCache("/simulator");
+  clearApiCache("/action-plans");
+  clearApiCache("/reports");
+  clearApiCache("/dashboard/summary");
 };
 
 export async function cachedGet<T>(
@@ -52,10 +69,25 @@ export async function cachedGet<T>(
     }
   }
 
-  const res = await apiClient.get(url, { params });
-  const data = res.data.data;
-  memoryCache.set(cacheKey, { data, timestamp: now });
-  return data as T;
+  // Deduplicate inflight requests — if the same URL is already being fetched,
+  // reuse the existing promise instead of firing a duplicate network call
+  const existingInflight = inflightRequests.get(cacheKey);
+  if (existingInflight) {
+    return existingInflight as Promise<T>;
+  }
+
+  const fetchPromise = apiClient.get(url, { params }).then((res) => {
+    const data = res.data.data;
+    memoryCache.set(cacheKey, { data, timestamp: Date.now() });
+    inflightRequests.delete(cacheKey);
+    return data as T;
+  }).catch((err) => {
+    inflightRequests.delete(cacheKey);
+    throw err;
+  });
+
+  inflightRequests.set(cacheKey, fetchPromise);
+  return fetchPromise;
 }
 
 // Attach JWT token from localStorage if available
@@ -140,6 +172,9 @@ export const industryApi = {
   getProfile: async (forceRefresh = false) => {
     return cachedGet<Industry>("/industry/profile", undefined, { forceRefresh, ttlMs: 120000 });
   },
+  list: async (forceRefresh = false) => {
+    return cachedGet<any[]>("/industry/list", undefined, { forceRefresh, ttlMs: 60000 });
+  },
   updateProfile: async (profile: Partial<Industry>) => {
     const res = await apiClient.put("/industry/profile", profile);
     clearApiCache("/industry");
@@ -149,8 +184,9 @@ export const industryApi = {
 };
 
 export const assessmentApi = {
-  list: async (forceRefresh = false) => {
-    return cachedGet<Assessment[]>("/assessments", undefined, { forceRefresh, ttlMs: 60000 });
+  list: async (forceRefresh = false, factoryId?: number) => {
+    const url = factoryId ? `/assessments?factory_id=${factoryId}` : "/assessments";
+    return cachedGet<Assessment[]>(url, undefined, { forceRefresh, ttlMs: 60000 });
   },
   create: async (data: any) => {
     const res = await apiClient.post("/assessments", data);
@@ -248,8 +284,12 @@ export const actionPlanApi = {
 };
 
 export const dashboardApi = {
-  getSummary: async (assessmentId?: number, forceRefresh = false) => {
-    const url = assessmentId ? `/dashboard/summary?assessment_id=${assessmentId}` : "/dashboard/summary";
+  getSummary: async (assessmentId?: number, factoryId?: number, forceRefresh = false) => {
+    const params = new URLSearchParams();
+    if (assessmentId) params.append("assessment_id", assessmentId.toString());
+    if (factoryId) params.append("factory_id", factoryId.toString());
+    const query = params.toString();
+    const url = query ? `/dashboard/summary?${query}` : "/dashboard/summary";
     return cachedGet<DashboardSummary>(url, undefined, { forceRefresh, ttlMs: 90000 });
   },
 };

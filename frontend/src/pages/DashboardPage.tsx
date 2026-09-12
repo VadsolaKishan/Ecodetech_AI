@@ -25,6 +25,8 @@ import { DashboardSummary } from "../types";
 
 interface DashboardPageProps {
   activeAssessmentId?: number;
+  activeFactoryId?: number;
+  activeFactoryName?: string;
   onSelectAssessment?: (id: number) => void;
 }
 
@@ -35,18 +37,21 @@ const CATEGORY_COLORS: Record<string, string> = {
   Transport: "#10B981",  // Emerald Green
 };
 
-export const DashboardPage: React.FC<DashboardPageProps> = ({ activeAssessmentId }) => {
+export const DashboardPage: React.FC<DashboardPageProps> = ({
+  activeAssessmentId,
+  activeFactoryId,
+  activeFactoryName,
+  onSelectAssessment,
+}) => {
   const navigate = useNavigate();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
-  const fetchSummary = async () => {
+  const fetchSummary = async (forceRefresh = false) => {
     try {
-      if (!summary) {
-        setLoading(true);
-      }
-      const data = await dashboardApi.getSummary(activeAssessmentId);
+      setLoading(true);
+      const data = await dashboardApi.getSummary(activeAssessmentId, activeFactoryId, forceRefresh);
       setSummary(data);
     } catch (err) {
       console.error("Failed to load dashboard summary", err);
@@ -56,8 +61,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ activeAssessmentId
   };
 
   useEffect(() => {
-    fetchSummary();
-  }, [activeAssessmentId]);
+    // Use cached data if available (prefetched during factory switch), otherwise fetch fresh
+    fetchSummary(false);
+  }, [activeAssessmentId, activeFactoryId]);
 
   const handleAddToActionPlan = async (rec: any) => {
     if (!summary?.assessment_id) return;
@@ -103,7 +109,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ activeAssessmentId
               <span>Verified Plant Profile Active</span>
             </div>
             <h2 className="text-2xl font-bold text-white tracking-tight">
-              {summary.factory_name}
+              {summary.factory_name || activeFactoryName || "Selected Facility"}
             </h2>
             <p className="text-sm text-industrial-400 max-w-lg mx-auto">
               Your facility profile ({summary.industry_type || "Manufacturing"}) is registered and verified. Run your first Carbon & Circularity Assessment to benchmark emissions and detect leak points.

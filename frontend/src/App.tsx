@@ -35,14 +35,15 @@ import { UnauthorizedPage } from "./pages/UnauthorizedPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
-import { dashboardApi, analysisApi, simulatorApi, actionPlanApi, reportApi, industryApi } from "./services/api";
+import { dashboardApi, analysisApi, simulatorApi, actionPlanApi, reportApi, industryApi, assessmentApi, clearAssessmentCache } from "./services/api";
 
 const Layout: React.FC<{
   children: React.ReactNode;
   activeAssessmentId?: number;
   factoryName: string;
   industryType: string;
-}> = ({ children, activeAssessmentId, factoryName, industryType }) => {
+  onSelectFactory?: (factoryId: number, factoryName: string, sector: string) => void;
+}> = ({ children, activeAssessmentId, factoryName, industryType, onSelectFactory }) => {
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const location = useLocation();
   const { isReadOnly } = useAuth();
@@ -59,6 +60,7 @@ const Layout: React.FC<{
         onOpenAssistant={() => !isReadOnly && setIsAssistantOpen(true)}
         factoryName={factoryName}
         industryType={industryType}
+        onSelectFactory={onSelectFactory}
       />
       <div className="flex flex-1">
         <Sidebar />
@@ -78,9 +80,13 @@ const Layout: React.FC<{
 
 function AppRoutes({
   activeAssessmentId,
+  activeFactoryId,
+  activeFactoryName,
   handleAssessmentSelected,
 }: {
   activeAssessmentId?: number;
+  activeFactoryId?: number;
+  activeFactoryName?: string;
   handleAssessmentSelected: (id: number) => void;
 }) {
   return (
@@ -101,6 +107,8 @@ function AppRoutes({
             <RoleGuard>
               <DashboardPage
                 activeAssessmentId={activeAssessmentId}
+                activeFactoryId={activeFactoryId}
+                activeFactoryName={activeFactoryName}
                 onSelectAssessment={handleAssessmentSelected}
               />
             </RoleGuard>
@@ -113,7 +121,11 @@ function AppRoutes({
         element={
           <ProtectedRoute>
             <RoleGuard allowedRoles={["FACTORY_OWNER", "SUSTAINABILITY_CONSULTANT", "ADMIN"]}>
-              <AssessmentWizardPage onAssessmentCreated={handleAssessmentSelected} />
+              <AssessmentWizardPage
+                activeFactoryId={activeFactoryId}
+                activeFactoryName={activeFactoryName}
+                onAssessmentCreated={handleAssessmentSelected}
+              />
             </RoleGuard>
           </ProtectedRoute>
         }
@@ -201,7 +213,11 @@ function AppRoutes({
         element={
           <ProtectedRoute>
             <RoleGuard>
-              <HistoryPage onSelectAssessment={handleAssessmentSelected} />
+              <HistoryPage
+                activeFactoryId={activeFactoryId}
+                activeFactoryName={activeFactoryName}
+                onSelectAssessment={handleAssessmentSelected}
+              />
             </RoleGuard>
           </ProtectedRoute>
         }
@@ -278,9 +294,17 @@ function MainApp() {
     const saved = localStorage.getItem("carbon_active_assessment");
     return saved ? parseInt(saved) : undefined;
   });
+  const [activeFactoryId, setActiveFactoryId] = useState<number | undefined>(() => {
+    const saved = localStorage.getItem("carbon_active_factory_id");
+    return saved ? parseInt(saved) : undefined;
+  });
 
-  const [factoryName, setFactoryName] = useState<string>("");
-  const [industryType, setIndustryType] = useState<string>("");
+  const [factoryName, setFactoryName] = useState<string>(() => {
+    return localStorage.getItem("carbon_active_factory_name") || "";
+  });
+  const [industryType, setIndustryType] = useState<string>(() => {
+    return localStorage.getItem("carbon_active_factory_sector") || "";
+  });
 
   const prefetchCoreData = (assessmentId: number) => {
     // Non-blocking background prefetch for instantaneous 0ms page navigation
@@ -293,32 +317,56 @@ function MainApp() {
     ]).catch(() => {});
   };
 
-  const refreshTelemetry = async (assessmentIdToFetch?: number) => {
+  const refreshTelemetry = async (assessmentIdToFetch?: number, factoryIdToFetch?: number) => {
+    let resolvedFactory = "";
+    let resolvedSector = "";
+    const targetAssessment = assessmentIdToFetch !== undefined ? assessmentIdToFetch : activeAssessmentId;
+    const targetFactory = factoryIdToFetch !== undefined ? factoryIdToFetch : activeFactoryId;
+
     try {
-      const target = assessmentIdToFetch || activeAssessmentId;
-      const summary = await dashboardApi.getSummary(target);
+      const summary = await dashboardApi.getSummary(targetAssessment, targetFactory, true);
       if (summary.assessment_id) {
         setActiveAssessmentId(summary.assessment_id);
         localStorage.setItem("carbon_active_assessment", summary.assessment_id.toString());
         prefetchCoreData(summary.assessment_id);
-      } else {
+      } else if (targetFactory) {
+        // Selected factory has no audit yet
         setActiveAssessmentId(undefined);
         localStorage.removeItem("carbon_active_assessment");
       }
-      if (summary.factory_name) setFactoryName(summary.factory_name);
-      if (summary.industry_type) setIndustryType(summary.industry_type);
+      if (summary.factory_name) resolvedFactory = summary.factory_name;
+      if (summary.industry_type) resolvedSector = summary.industry_type;
+      if (summary.factory_id && !targetFactory) {
+        setActiveFactoryId(summary.factory_id);
+        localStorage.setItem("carbon_active_factory_id", summary.factory_id.toString());
+      }
     } catch (err) {
       // User may not have created an assessment yet
     }
 
-    // Always fetch industry profile to guarantee exact factory metadata for any logged-in user
-    try {
-      const ind = await industryApi.getProfile();
-      if (ind && ind.company_name) {
-        setFactoryName(ind.company_name);
-        setIndustryType(ind.industry_type || "");
-      }
-    } catch (e) {}
+    // Only fallback to user profile if no factory was resolved from active assessment
+    if (!resolvedFactory) {
+      try {
+        const ind = await industryApi.getProfile();
+        if (ind && ind.company_name) {
+          resolvedFactory = ind.company_name;
+          resolvedSector = ind.industry_type || "";
+          if (!activeFactoryId && ind.id) {
+            setActiveFactoryId(ind.id);
+            localStorage.setItem("carbon_active_factory_id", ind.id.toString());
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (resolvedFactory) {
+      setFactoryName(resolvedFactory);
+      localStorage.setItem("carbon_active_factory_name", resolvedFactory);
+    }
+    if (resolvedSector) {
+      setIndustryType(resolvedSector);
+      localStorage.setItem("carbon_active_factory_sector", resolvedSector);
+    }
   };
 
   useEffect(() => {
@@ -329,15 +377,63 @@ function MainApp() {
       }
     } else {
       setActiveAssessmentId(undefined);
+      setActiveFactoryId(undefined);
       setFactoryName("");
       setIndustryType("");
+      localStorage.removeItem("carbon_active_factory_name");
+      localStorage.removeItem("carbon_active_factory_sector");
+      localStorage.removeItem("carbon_active_factory_id");
     }
   }, [token, isAuthenticated, user?.id]);
 
   const handleAssessmentSelected = (newAssessmentId: number) => {
     setActiveAssessmentId(newAssessmentId);
     localStorage.setItem("carbon_active_assessment", newAssessmentId.toString());
-    refreshTelemetry(newAssessmentId);
+    refreshTelemetry(newAssessmentId, activeFactoryId);
+  };
+
+  const handleFactorySelected = async (factoryId: number, name: string, sector: string) => {
+    // 1. Immediately update UI state for instant visual feedback
+    setActiveFactoryId(factoryId);
+    localStorage.setItem("carbon_active_factory_id", factoryId.toString());
+    setFactoryName(name);
+    localStorage.setItem("carbon_active_factory_name", name);
+    setIndustryType(sector);
+    localStorage.setItem("carbon_active_factory_sector", sector);
+
+    // 2. Flush stale assessment-specific cache from previous factory
+    clearAssessmentCache();
+
+    // 3. Fetch assessments + dashboard summary IN PARALLEL for speed
+    try {
+      const [factoryAssessments, dashSummary] = await Promise.all([
+        assessmentApi.list(true, factoryId),
+        dashboardApi.getSummary(undefined, factoryId, true).catch(() => null),
+      ]);
+
+      let resolvedAssessmentId: number | undefined;
+
+      if (factoryAssessments && factoryAssessments.length > 0) {
+        resolvedAssessmentId = factoryAssessments[0].id;
+      }
+      // Also check if dashboard summary returned an assessment_id
+      if (!resolvedAssessmentId && dashSummary?.assessment_id) {
+        resolvedAssessmentId = dashSummary.assessment_id;
+      }
+
+      if (resolvedAssessmentId) {
+        setActiveAssessmentId(resolvedAssessmentId);
+        localStorage.setItem("carbon_active_assessment", resolvedAssessmentId.toString());
+        // 4. Fire-and-forget: prefetch ALL page data in parallel
+        //    Pages will reuse these cached responses via deduplication
+        prefetchCoreData(resolvedAssessmentId);
+      } else {
+        setActiveAssessmentId(undefined);
+        localStorage.removeItem("carbon_active_assessment");
+      }
+    } catch (e) {
+      console.error("Failed to switch factory assessment", e);
+    }
   };
 
   return (
@@ -346,9 +442,12 @@ function MainApp() {
         activeAssessmentId={activeAssessmentId}
         factoryName={factoryName}
         industryType={industryType}
+        onSelectFactory={handleFactorySelected}
       >
         <AppRoutes
           activeAssessmentId={activeAssessmentId}
+          activeFactoryId={activeFactoryId}
+          activeFactoryName={factoryName}
           handleAssessmentSelected={handleAssessmentSelected}
         />
       </Layout>

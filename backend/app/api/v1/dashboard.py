@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from app.database.session import get_db
 from app.models.models import (
-    Assessment, Industry, EmissionResult, EmissionHotspot, Recommendation, User,
+    Assessment, Industry, Factory, EmissionResult, EmissionHotspot, Recommendation, User,
     FactoryAssignment
 )
 from app.schemas.schemas import ApiResponse
@@ -16,11 +16,12 @@ router = APIRouter()
 @router.get("/summary", response_model=ApiResponse)
 def get_dashboard_summary(
     assessment_id: Optional[int] = Query(None),
+    factory_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     if assessment_id:
-        cache_key = f"dash_summary_{assessment_id}_{current_user.id}"
+        cache_key = f"dash_summary_{assessment_id}_{factory_id}_{current_user.id}"
         cached = api_cache.get(cache_key)
         if cached:
             return ApiResponse(success=True, data=cached)
@@ -28,14 +29,43 @@ def get_dashboard_summary(
     user_role = (current_user.role or "").lower()
     assessment = None
 
+    target_ind = None
+    fac_ids = []
+    if factory_id:
+        target_ind = db.query(Industry).filter(Industry.id == factory_id).first()
+        if target_ind:
+            fac_ids = [f.id for f in db.query(Factory).filter(Factory.industry_id == target_ind.id).all()]
+        else:
+            target_fac = db.query(Factory).filter(Factory.id == factory_id).first()
+            if target_fac:
+                fac_ids = [target_fac.id]
+                if target_fac.industry_id:
+                    target_ind = db.query(Industry).filter(Industry.id == target_fac.industry_id).first()
+
     if assessment_id:
         try:
             assessment = verify_assessment_access(db, current_user, assessment_id, read_only=True)
+            # If factory_id is specified, verify it matches
+            if factory_id and assessment:
+                matches_ind = target_ind and assessment.industry_id == target_ind.id
+                matches_fac = assessment.factory_id in fac_ids or assessment.industry_id == factory_id
+                if not (matches_ind or matches_fac):
+                    assessment = None
         except HTTPException:
-            # If current user switched or does not have access to this assessment_id, gracefully resolve default
             assessment = None
 
-    if not assessment:
+    if not assessment and factory_id:
+        # Explicit factory requested: find the latest assessment for this specific factory
+        if target_ind:
+            assessment = db.query(Assessment).filter(
+                (Assessment.industry_id == target_ind.id) | (Assessment.factory_id.in_(fac_ids))
+            ).order_by(Assessment.created_at.desc()).first()
+        else:
+            assessment = db.query(Assessment).filter(
+                (Assessment.industry_id == factory_id) | (Assessment.factory_id.in_(fac_ids or [factory_id]))
+            ).order_by(Assessment.created_at.desc()).first()
+
+    if not assessment and not factory_id:
         # Resolve appropriate default assessment based on role
         if user_role == UserRole.ADMIN:
             assessment = db.query(Assessment).order_by(Assessment.created_at.desc()).first()
@@ -65,9 +95,11 @@ def get_dashboard_summary(
             assessment = db.query(Assessment).filter(Assessment.industry_id.in_(owned_ids) if owned_ids else Assessment.user_id == current_user.id).order_by(Assessment.created_at.desc()).first()
 
     if not assessment:
-        # Determine if this user already has an Industry profile
-        user_industry = None
-        if current_user.industry_id:
+        # Determine if target factory exists
+        user_industry = target_ind
+        if not user_industry and factory_id:
+            user_industry = db.query(Industry).filter(Industry.id == factory_id).first()
+        if not user_industry and current_user.industry_id:
             user_industry = db.query(Industry).filter(Industry.id == current_user.industry_id).first()
         if not user_industry:
             user_industry = db.query(Industry).filter(Industry.user_id == current_user.id).first()
@@ -159,15 +191,22 @@ def get_dashboard_summary(
         for r in recommendations[:4]
     ]
 
+    fac_name = industry.company_name if industry else (assessment.factory.name if assessment.factory else "Industrial Facility")
+    fac_sector = industry.industry_type if industry else (assessment.factory.sector if assessment.factory else "Manufacturing")
+    fac_loc = industry.factory_location if industry else (assessment.factory.location if assessment.factory else "Industrial Zone")
+    fac_id = industry.id if industry else (assessment.factory.id if assessment.factory else assessment.industry_id)
+
     summary_data = {
         "has_assessment": True,
         "assessment_id": assessment.id,
         "assessment_name": assessment.name,
-        "factory_name": industry.company_name if industry else "Shree Gujarat Textile Works Pvt. Ltd.",
-        "industry_type": industry.industry_type if industry else "Textile Manufacturing",
-        "location": industry.factory_location if industry else "Ahmedabad, Gujarat, India",
-        "headline": f"Good morning. Here's {industry.company_name if industry else 'Shree Gujarat Textile Works'}'s carbon intelligence.",
+        "factory_id": fac_id,
+        "factory_name": fac_name,
+        "industry_type": fac_sector,
+        "location": fac_loc,
+        "headline": f"Carbon Intelligence Overview for {fac_name}.",
         "kpis": {
+
             "total_emissions_tco2e": round(assessment.total_emissions_tco2e, 2),
             "potential_reduction_pct": red_pct,
             "potential_reduction_tco2e": round(assessment.potential_reduction_tco2e, 2),
