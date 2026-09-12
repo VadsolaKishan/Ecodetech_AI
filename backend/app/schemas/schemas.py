@@ -283,3 +283,34 @@ class ChatResponse(BaseModel):
     context_used: Dict[str, Any] = {}
     model_used: Optional[str] = None
     is_llm_active: bool = False
+
+# Bill OCR & Smart Ingest
+class BillOcrSampleRequest(BaseModel):
+    sample_type: str = "electricity_torrent" # electricity_torrent, fuel_diesel_iocl, material_cotton
+
+class SuggestedInputItem(BaseModel):
+    target_step: str = "energy" # energy, material, waste
+    source_type: Optional[str] = None
+    material_name: Optional[str] = None
+    material_type: Optional[str] = None
+    waste_type: Optional[str] = None
+    quantity: float = 0.0
+    unit: str = "kWh"
+    renewable_percentage: float = 0.0
+    virgin_percentage: float = 100.0
+    recycled_percentage: float = 0.0
+    supplier_distance_km: float = 0.0
+    notes: Optional[str] = None
+
+class BillOcrResult(BaseModel):
+    document_type: str
+    vendor_or_utility: Optional[str] = None
+    consumer_or_invoice_no: Optional[str] = None
+    billing_period: Optional[str] = None
+    total_amount_inr: Optional[float] = None
+    confidence_score: float = 0.95
+    extracted_metrics: Dict[str, Any] = {}
+    suggested_inputs: List[SuggestedInputItem] = []
+    summary: str
+    engine_used: Optional[str] = None
+    is_sample_demo: bool = False

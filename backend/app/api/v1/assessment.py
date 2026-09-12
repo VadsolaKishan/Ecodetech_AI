@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, File, UploadFile
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database.session import get_db
@@ -6,7 +6,10 @@ from app.models.models import (
     Assessment, Industry, EnergyInput, MaterialInput, WasteInput, TransportInput, User,
     FactoryAssignment, Factory
 )
-from app.schemas.schemas import AssessmentCreate, AssessmentOut, AssessmentFullDetail, ApiResponse
+from app.schemas.schemas import (
+    AssessmentCreate, AssessmentOut, AssessmentFullDetail, ApiResponse,
+    BillOcrSampleRequest, BillOcrResult
+)
 from app.core.roles import UserRole, AuditEvent
 from app.api.deps import (
     get_current_user, require_roles,
@@ -17,6 +20,7 @@ from app.services.hotspot_detector import HotspotDetectionEngine
 from app.services.recommendation_engine import RecommendationEngine
 from app.services.circularity_score import CircularityScoringEngine
 from app.services.audit_service import log_audit_event
+from app.services.ocr_service import BillOcrService
 
 router = APIRouter()
 
@@ -252,3 +256,28 @@ def delete_assessment(
     )
 
     return ApiResponse(success=True, message="Assessment deleted successfully")
+
+@router.post("/ocr-bill", response_model=ApiResponse)
+async def scan_bill_ocr(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_roles(UserRole.FACTORY_OWNER, UserRole.SUSTAINABILITY_CONSULTANT, UserRole.ADMIN))
+):
+    try:
+        content = await file.read()
+        mime_type = file.content_type or "image/jpeg"
+        service = BillOcrService()
+        result = service.extract_from_file_bytes(content, mime_type=mime_type, filename=file.filename or "")
+        return ApiResponse(success=True, message="Bill parsed successfully with Gemini Vision", data=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse bill: {str(e)}")
+
+@router.post("/ocr-sample", response_model=ApiResponse)
+def get_ocr_sample(
+    payload: BillOcrSampleRequest,
+    current_user: User = Depends(require_roles(UserRole.FACTORY_OWNER, UserRole.SUSTAINABILITY_CONSULTANT, UserRole.ADMIN))
+):
+    service = BillOcrService()
+    result = service.get_sample_preset(payload.sample_type)
+    if not result:
+        raise HTTPException(status_code=404, detail="Sample preset not found")
+    return ApiResponse(success=True, message="Loaded sample bill preset", data=result)

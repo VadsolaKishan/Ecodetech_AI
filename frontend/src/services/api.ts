@@ -165,6 +165,20 @@ export const assessmentApi = {
     clearApiCache();
     return res.data;
   },
+  scanBill: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await apiClient.post("/assessments/ocr-bill", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return res.data.data;
+  },
+  scanSampleBill: async (sampleType: string) => {
+    const res = await apiClient.post("/assessments/ocr-sample", { sample_type: sampleType });
+    return res.data.data;
+  },
 };
 
 export const analysisApi = {

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
+# EcoDetect AI - Industrial Decarbonization Platform
 from app.core.config import settings
 from app.database.session import engine, Base
 

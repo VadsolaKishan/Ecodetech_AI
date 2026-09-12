@@ -12,9 +12,12 @@ import {
   Sparkles,
   Plus,
   Trash,
-  Sliders
+  Sliders,
+  ScanLine,
+  FileText
 } from "lucide-react";
 import { assessmentApi } from "../services/api";
+import { BillOcrModal, SuggestedItem } from "../components/BillOcrModal";
 
 interface AssessmentWizardPageProps {
   onAssessmentCreated: (id: number) => void;
@@ -31,18 +34,95 @@ export const AssessmentWizardPage: React.FC<AssessmentWizardPageProps> = ({ onAs
   const [monthlyProduction, setMonthlyProduction] = useState(120);
   const [productionUnit, setProductionUnit] = useState("tonnes fabric");
 
+  // Snap & Ingest (AI OCR) State
+  const [isOcrModalOpen, setIsOcrModalOpen] = useState(false);
+  const [ocrNotice, setOcrNotice] = useState<string | null>(null);
+
   // Step 1: Energy Inputs
-  const [energyInputs, setEnergyInputs] = useState([
+  const [energyInputs, setEnergyInputs] = useState<Array<{
+    source_type: string;
+    quantity: number;
+    unit: string;
+    renewable_percentage: number;
+    is_ocr_filled?: boolean;
+  }>>([
     { source_type: "grid_electricity", quantity: 125000, unit: "kWh", renewable_percentage: 0 },
     { source_type: "coal", quantity: 28, unit: "tonne", renewable_percentage: 0 },
     { source_type: "diesel", quantity: 1500, unit: "litre", renewable_percentage: 0 },
   ]);
 
   // Step 2: Material Inputs
-  const [materialInputs, setMaterialInputs] = useState([
+  const [materialInputs, setMaterialInputs] = useState<Array<{
+    material_name: string;
+    material_type: string;
+    quantity: number;
+    unit: string;
+    virgin_percentage: number;
+    recycled_percentage: number;
+    supplier_distance_km: number;
+    is_ocr_filled?: boolean;
+  }>>([
     { material_name: "Polyester Filament Yarn", material_type: "Textiles/Fibers", quantity: 50, unit: "tonne", virgin_percentage: 90, recycled_percentage: 10, supplier_distance_km: 150 },
     { material_name: "Raw Carded Cotton", material_type: "Textiles/Fibers", quantity: 30, unit: "tonne", virgin_percentage: 85, recycled_percentage: 15, supplier_distance_km: 220 },
   ]);
+
+  const handleApplyOcrInputs = (items: SuggestedItem[], summaryMsg: string) => {
+    let energyUpdated = false;
+    let materialUpdated = false;
+
+    items.forEach((item) => {
+      if (item.target_step === "energy") {
+        setEnergyInputs((prev) => {
+          const existingIdx = prev.findIndex((e) => e.source_type === item.source_type);
+          if (existingIdx >= 0) {
+            const updated = [...prev];
+            updated[existingIdx] = {
+              ...updated[existingIdx],
+              quantity: item.quantity,
+              unit: item.unit || updated[existingIdx].unit,
+              renewable_percentage: item.renewable_percentage ?? updated[existingIdx].renewable_percentage,
+              is_ocr_filled: true,
+            };
+            return updated;
+          } else {
+            return [
+              ...prev,
+              {
+                source_type: item.source_type || "grid_electricity",
+                quantity: item.quantity,
+                unit: item.unit || "kWh",
+                renewable_percentage: item.renewable_percentage || 0,
+                is_ocr_filled: true,
+              },
+            ];
+          }
+        });
+        energyUpdated = true;
+      } else if (item.target_step === "material") {
+        setMaterialInputs((prev) => [
+          ...prev,
+          {
+            material_name: item.material_name || "Extracted Material",
+            material_type: item.material_type || "Textiles/Fibers",
+            quantity: item.quantity || 10,
+            unit: item.unit || "tonne",
+            virgin_percentage: item.virgin_percentage ?? (100 - (item.recycled_percentage || 0)),
+            recycled_percentage: item.recycled_percentage || 0,
+            supplier_distance_km: item.supplier_distance_km || 100,
+            is_ocr_filled: true,
+          },
+        ]);
+        materialUpdated = true;
+      }
+    });
+
+    setOcrNotice(summaryMsg || "Successfully auto-filled inputs from document via Gemini Vision!");
+    if (energyUpdated) {
+      setCurrentStep(1);
+    } else if (materialUpdated) {
+      setCurrentStep(2);
+    }
+  };
 
   // Step 3: Waste Inputs
   const [wasteInputs, setWasteInputs] = useState([
@@ -119,8 +199,8 @@ export const AssessmentWizardPage: React.FC<AssessmentWizardPageProps> = ({ onAs
         assessment_period: "Monthly Operational Audit",
         monthly_production: monthlyProduction,
         production_unit: productionUnit,
-        energy_inputs: energyInputs,
-        material_inputs: materialInputs,
+        energy_inputs: energyInputs.map(({ is_ocr_filled, ...rest }) => rest),
+        material_inputs: materialInputs.map(({ is_ocr_filled, ...rest }) => rest),
         waste_inputs: wasteInputs,
         transport_inputs: transportInputs,
       };
@@ -175,6 +255,46 @@ export const AssessmentWizardPage: React.FC<AssessmentWizardPageProps> = ({ onAs
         </div>
       </div>
 
+      {/* Snap & Ingest Quick-Action Banner */}
+      <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-carbon-green/20 via-industrial-900 to-industrial-950 border border-carbon-green/40 shadow-lg shadow-carbon-green/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-carbon-green/20 border border-carbon-green/50 flex items-center justify-center text-carbon-green shadow-glow-green">
+            <ScanLine className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-white uppercase tracking-wider">⚡ AI Multimodal Ingest ("Snap & Assess")</span>
+              <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-carbon-green text-industrial-950">
+                Gemini 3.6 Flash
+              </span>
+            </div>
+            <p className="text-xs text-industrial-300 mt-0.5">
+              Skip manual typing — upload an electricity bill, diesel slip or material invoice to auto-fill Scope 1 & 2 inputs in 3 seconds.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsOcrModalOpen(true)}
+          className="px-4 py-2 rounded-xl bg-carbon-green text-industrial-950 font-bold text-xs hover:bg-carbon-green-hover shadow-glow-green transition flex items-center gap-1.5 flex-shrink-0"
+        >
+          <Sparkles className="w-3.5 h-3.5" /> Snap & Ingest Bill
+        </button>
+      </div>
+
+      {/* Auto-filled Toast Alert */}
+      {ocrNotice && (
+        <div className="mb-6 p-3.5 rounded-xl bg-carbon-green/15 border border-carbon-green/50 text-xs text-carbon-green flex items-center justify-between animate-fade-in shadow-glow-green">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-carbon-green flex-shrink-0" />
+            <span>{ocrNotice}</span>
+          </div>
+          <button onClick={() => setOcrNotice(null)} className="text-carbon-green hover:text-white text-xs underline ml-2">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Main Wizard Form Container */}
       <div className="p-6 rounded-2xl bg-industrial-900/90 border border-industrial-800 shadow-card-dark">
         {/* Step 1: Energy */}
@@ -189,20 +309,40 @@ export const AssessmentWizardPage: React.FC<AssessmentWizardPageProps> = ({ onAs
                   Electricity grid imports (Scope 2) and on-site fuel combustion (Scope 1).
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={addEnergyRow}
-                className="px-3 py-1.5 rounded-lg bg-industrial-800 hover:bg-industrial-700 text-xs text-carbon-green font-medium flex items-center gap-1 border border-industrial-700"
-              >
-                <Plus className="w-3.5 h-3.5" /> Add Energy Source
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsOcrModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-carbon-green/15 hover:bg-carbon-green/25 text-xs text-carbon-green font-bold flex items-center gap-1.5 border border-carbon-green/40 shadow-glow-green/30 transition"
+                >
+                  <ScanLine className="w-3.5 h-3.5" /> Scan Bill / Receipt (OCR)
+                </button>
+                <button
+                  type="button"
+                  onClick={addEnergyRow}
+                  className="px-3 py-1.5 rounded-lg bg-industrial-800 hover:bg-industrial-700 text-xs text-carbon-green font-medium flex items-center gap-1 border border-industrial-700"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Energy Source
+                </button>
+              </div>
             </div>
 
             <div className="space-y-3">
               {energyInputs.map((e, idx) => (
-                <div key={idx} className="grid grid-cols-1 sm:grid-cols-5 gap-3 p-3 bg-industrial-950/60 rounded-xl border border-industrial-800 items-end">
+                <div key={idx} className={`grid grid-cols-1 sm:grid-cols-5 gap-3 p-3 rounded-xl border items-end relative transition-all ${
+                  e.is_ocr_filled
+                    ? "bg-carbon-green/10 border-carbon-green/40 shadow-glow-green/20"
+                    : "bg-industrial-950/60 border-industrial-800"
+                }`}>
                   <div className="sm:col-span-2">
-                    <label className="block text-[11px] text-industrial-400 mb-1">Source Type</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] text-industrial-400">Source Type</label>
+                      {e.is_ocr_filled && (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-carbon-green/20 text-carbon-green border border-carbon-green/30">
+                          ⚡ Auto-filled (Gemini OCR)
+                        </span>
+                      )}
+                    </div>
                     <select
                       value={e.source_type}
                       onChange={(ev) => {
@@ -300,21 +440,41 @@ export const AssessmentWizardPage: React.FC<AssessmentWizardPageProps> = ({ onAs
                   Purchased goods and feedstock (Scope 3 Category 1 - Embodied Carbon).
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={addMaterialRow}
-                className="px-3 py-1.5 rounded-lg bg-industrial-800 hover:bg-industrial-700 text-xs text-carbon-green font-medium flex items-center gap-1 border border-industrial-700"
-              >
-                <Plus className="w-3.5 h-3.5" /> Add Material
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsOcrModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-carbon-green/15 hover:bg-carbon-green/25 text-xs text-carbon-green font-bold flex items-center gap-1.5 border border-carbon-green/40 shadow-glow-green/30 transition"
+                >
+                  <ScanLine className="w-3.5 h-3.5" /> Scan Invoice (OCR)
+                </button>
+                <button
+                  type="button"
+                  onClick={addMaterialRow}
+                  className="px-3 py-1.5 rounded-lg bg-industrial-800 hover:bg-industrial-700 text-xs text-carbon-green font-medium flex items-center gap-1 border border-industrial-700"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Material
+                </button>
+              </div>
             </div>
 
             <div className="space-y-3">
               {materialInputs.map((m, idx) => (
-                <div key={idx} className="p-3 bg-industrial-950/60 rounded-xl border border-industrial-800 space-y-3">
+                <div key={idx} className={`p-3 rounded-xl border space-y-3 transition-all ${
+                  m.is_ocr_filled
+                    ? "bg-carbon-green/10 border-carbon-green/40 shadow-glow-green/20"
+                    : "bg-industrial-950/60 border-industrial-800"
+                }`}>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                     <div className="sm:col-span-2">
-                      <label className="block text-[11px] text-industrial-400 mb-1">Material Name</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] text-industrial-400">Material Name</label>
+                        {m.is_ocr_filled && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-carbon-green/20 text-carbon-green border border-carbon-green/30">
+                            ⚡ Auto-filled (Gemini OCR)
+                          </span>
+                        )}
+                      </div>
                       <input
                         type="text"
                         value={m.material_name}
@@ -773,6 +933,13 @@ export const AssessmentWizardPage: React.FC<AssessmentWizardPageProps> = ({ onAs
           </div>
         )}
       </div>
+
+      {/* Bill & Invoice OCR Modal */}
+      <BillOcrModal
+        isOpen={isOcrModalOpen}
+        onClose={() => setIsOcrModalOpen(false)}
+        onApplyInputs={handleApplyOcrInputs}
+      />
     </div>
   );
 };
