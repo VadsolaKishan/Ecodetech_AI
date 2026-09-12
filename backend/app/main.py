@@ -43,6 +43,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Enable GZip compression for API payloads to accelerate page load and API responsiveness
+from starlette.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 # Mount API Routers
 api_v1 = settings.API_V1_STR
 app.include_router(auth_router, prefix=f"{api_v1}/auth", tags=["Authentication"])

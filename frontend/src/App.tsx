@@ -1,41 +1,42 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { RoleGuard } from "./components/RoleGuard";
 import { Navbar } from "./components/Navbar";
 import { Sidebar } from "./components/Sidebar";
-import { AiAssistantModal } from "./components/AiAssistantModal";
+const AiAssistantModal = lazy(() => import("./components/AiAssistantModal").then(m => ({ default: m.AiAssistantModal })));
 
-// Pages
-import { LandingPage } from "./pages/LandingPage";
-import { LoginPage } from "./pages/LoginPage";
-import { RegisterPage } from "./pages/RegisterPage";
-import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
-import { DashboardPage } from "./pages/DashboardPage";
-import { AssessmentWizardPage } from "./pages/AssessmentWizardPage";
-import { HotspotsPage } from "./pages/HotspotsPage";
-import { RecommendationsPage } from "./pages/RecommendationsPage";
-import { SimulatorPage } from "./pages/SimulatorPage";
-import { ScenarioComparisonPage } from "./pages/ScenarioComparisonPage";
-import { ActionPlanPage } from "./pages/ActionPlanPage";
-import { ReportsPage } from "./pages/ReportsPage";
-import { ProfilePage } from "./pages/ProfilePage";
-import { HistoryPage } from "./pages/HistoryPage";
+// Lazy-loaded Pages — each becomes a separate JS chunk for faster initial load
+const LandingPage = lazy(() => import("./pages/LandingPage").then(m => ({ default: m.LandingPage })));
+const LoginPage = lazy(() => import("./pages/LoginPage").then(m => ({ default: m.LoginPage })));
+const RegisterPage = lazy(() => import("./pages/RegisterPage").then(m => ({ default: m.RegisterPage })));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage").then(m => ({ default: m.ForgotPasswordPage })));
+const DashboardPage = lazy(() => import("./pages/DashboardPage").then(m => ({ default: m.DashboardPage })));
+const AssessmentWizardPage = lazy(() => import("./pages/AssessmentWizardPage").then(m => ({ default: m.AssessmentWizardPage })));
+const HotspotsPage = lazy(() => import("./pages/HotspotsPage").then(m => ({ default: m.HotspotsPage })));
+const RecommendationsPage = lazy(() => import("./pages/RecommendationsPage").then(m => ({ default: m.RecommendationsPage })));
+const SimulatorPage = lazy(() => import("./pages/SimulatorPage").then(m => ({ default: m.SimulatorPage })));
+const ScenarioComparisonPage = lazy(() => import("./pages/ScenarioComparisonPage").then(m => ({ default: m.ScenarioComparisonPage })));
+const ActionPlanPage = lazy(() => import("./pages/ActionPlanPage").then(m => ({ default: m.ActionPlanPage })));
+const ReportsPage = lazy(() => import("./pages/ReportsPage").then(m => ({ default: m.ReportsPage })));
+const ProfilePage = lazy(() => import("./pages/ProfilePage").then(m => ({ default: m.ProfilePage })));
+const HistoryPage = lazy(() => import("./pages/HistoryPage").then(m => ({ default: m.HistoryPage })));
 
 // Admin & Governance Pages
-import { AuditLogsPage } from "./pages/AuditLogsPage";
-import { EmissionFactorsPage } from "./pages/EmissionFactorsPage";
-import { RecommendationKnowledgePage } from "./pages/RecommendationKnowledgePage";
-import { AdminUsersPage } from "./pages/AdminUsersPage";
-import { AdminIndustriesPage } from "./pages/AdminIndustriesPage";
+const AuditLogsPage = lazy(() => import("./pages/AuditLogsPage").then(m => ({ default: m.AuditLogsPage })));
+const EmissionFactorsPage = lazy(() => import("./pages/EmissionFactorsPage").then(m => ({ default: m.EmissionFactorsPage })));
+const RecommendationKnowledgePage = lazy(() => import("./pages/RecommendationKnowledgePage").then(m => ({ default: m.RecommendationKnowledgePage })));
+const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage").then(m => ({ default: m.AdminUsersPage })));
+const AdminIndustriesPage = lazy(() => import("./pages/AdminIndustriesPage").then(m => ({ default: m.AdminIndustriesPage })));
 
 // Error Pages
-import { UnauthorizedPage } from "./pages/UnauthorizedPage";
-import { ForbiddenPage } from "./pages/ForbiddenPage";
-import { NotFoundPage } from "./pages/NotFoundPage";
+const UnauthorizedPage = lazy(() => import("./pages/UnauthorizedPage").then(m => ({ default: m.UnauthorizedPage })));
+const ForbiddenPage = lazy(() => import("./pages/ForbiddenPage").then(m => ({ default: m.ForbiddenPage })));
+const NotFoundPage = lazy(() => import("./pages/NotFoundPage").then(m => ({ default: m.NotFoundPage })));
 
 import { dashboardApi, analysisApi, simulatorApi, actionPlanApi, reportApi, industryApi, assessmentApi, clearAssessmentCache } from "./services/api";
+
 
 const Layout: React.FC<{
   children: React.ReactNode;
@@ -66,13 +67,15 @@ const Layout: React.FC<{
         <Sidebar />
         <main className="flex-1 overflow-x-hidden">{children}</main>
       </div>
-      {!isReadOnly && (
-        <AiAssistantModal
-          isOpen={isAssistantOpen}
-          onClose={() => setIsAssistantOpen(false)}
-          assessmentId={activeAssessmentId}
-          factoryName={factoryName}
-        />
+      {!isReadOnly && isAssistantOpen && (
+        <Suspense fallback={null}>
+          <AiAssistantModal
+            isOpen={isAssistantOpen}
+            onClose={() => setIsAssistantOpen(false)}
+            assessmentId={activeAssessmentId}
+            factoryName={factoryName}
+          />
+        </Suspense>
       )}
     </div>
   );
@@ -90,6 +93,11 @@ function AppRoutes({
   handleAssessmentSelected: (id: number) => void;
 }) {
   return (
+    <Suspense fallback={
+      <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+        <div className="w-7 h-7 border-2 border-carbon-green border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    }>
     <Routes>
       {/* Public Routes */}
       <Route path="/" element={<LandingPage />} />
@@ -285,6 +293,7 @@ function AppRoutes({
       {/* 404 Catch-All */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </Suspense>
   );
 }
 
@@ -307,14 +316,22 @@ function MainApp() {
   });
 
   const prefetchCoreData = (assessmentId: number) => {
-    // Non-blocking background prefetch for instantaneous 0ms page navigation
-    Promise.allSettled([
-      analysisApi.getHotspots(assessmentId),
-      analysisApi.getRecommendations(assessmentId),
-      simulatorApi.getScenarios(assessmentId),
-      actionPlanApi.list(assessmentId),
-      reportApi.getReport(assessmentId),
-    ]).catch(() => {});
+    // Non-blocking deferred background prefetch for instantaneous subsequent page navigation
+    const executePrefetch = () => {
+      Promise.allSettled([
+        analysisApi.getHotspots(assessmentId),
+        analysisApi.getRecommendations(assessmentId),
+        simulatorApi.getScenarios(assessmentId),
+        actionPlanApi.list(assessmentId),
+        reportApi.getReport(assessmentId),
+      ]).catch(() => {});
+    };
+
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      (window as any).requestIdleCallback(executePrefetch, { timeout: 3000 });
+    } else {
+      setTimeout(executePrefetch, 1000);
+    }
   };
 
   const refreshTelemetry = async (assessmentIdToFetch?: number, factoryIdToFetch?: number) => {
