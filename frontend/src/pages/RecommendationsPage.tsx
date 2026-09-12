@@ -73,8 +73,8 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ active
         priority: rec.priority_rank === 1 ? "High" : rec.priority_rank <= 3 ? "Medium" : "Low",
         owner: "Factory Operations Team",
         deadline: "Q4 2026",
-        estimated_cost_inr: rec.cost_inr,
-        expected_co2_reduction_kg: rec.co2_cut_kg,
+        estimated_cost_inr: rec.implementation_cost_inr,
+        expected_co2_reduction_kg: rec.estimated_co2_reduction_kg,
         status: "Planned",
       });
       setToastMsg(`Added "${rec.title}" to Action Roadmap!`);
